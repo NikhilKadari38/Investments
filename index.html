@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NK Trade Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Login Overlay ──────────────────────────────────────────────────── -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <div class="login-logo">NK</div>
+      <h2>Trade Tracker</h2>
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+      <button id="loginBtn">Access</button>
+      <p id="loginError" class="error-msg"></p>
+    </div>
+  </div>
+
+  <!-- ── Main App ───────────────────────────────────────────────────────── -->
+  <div id="app" class="app hidden">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span class="logo-mark">NK</span>
+        <span class="logo-text">Trade Tracker</span>
+      </div>
+      <nav class="nav">
+        <a href="#" class="nav-link active">Portfolio</a>
+      </nav>
+      <div class="header-right">
+        <div class="market-status">
+          <span class="status-dot" id="marketStatusDot"></span>
+          <span id="marketStatusText">–</span>
+        </div>
+        <button class="btn-logout" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main-content">
+
+      <!-- ── Left: Trades Table ──────────────────────────────────────── -->
+      <section class="section-left">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h1 class="section-title">Portfolio</h1>
+            <div class="filter-tabs">
+              <button class="filter-tab active" data-filter="all">All</button>
+              <button class="filter-tab" data-filter="open">Open</button>
+              <button class="filter-tab" data-filter="closed">Closed</button>
+            </div>
+          </div>
+          <button class="btn-add" id="addTradeBtn">+ Add Trade</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="trade-table" id="tradeTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Shares</th>
+                <th>Buy Price</th>
+                <th>Buy Date</th>
+                <th>Invested</th>
+                <th>Live Price</th>
+                <th>Curr. Value</th>
+                <th>Sell Price</th>
+                <th>Sell Date</th>
+                <th>Returns</th>
+                <th>P/L %</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tradeTableBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state">
+            <p>No trades yet — click <strong>+ Add Trade</strong> to get started.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Right: Summary Panel ────────────────────────────────────── -->
+      <aside class="section-right">
+        <h2 class="summary-title">Summary</h2>
+
+        <div class="summary-cards">
+          <div class="summary-card">
+            <span class="summary-label">Active Invested</span>
+            <span class="summary-value" id="sumActiveInvested">₹0.00</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Current Value</span>
+            <span class="summary-value" id="sumCurrentValue">₹0.00</span>
+          </div>
+          <div class="summary-card span-2">
+            <span class="summary-label">Unrealized P/L</span>
+            <span class="summary-value" id="sumUnrealized">₹0.00</span>
+            <span class="summary-sub" id="sumUnrealizedPct">+0.00%</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Realized Returns</span>
+            <span class="summary-value" id="sumRealized">₹0.00</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Total Trades</span>
+            <span class="summary-value" id="sumTotalTrades">0</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Win Rate</span>
+            <span class="summary-value" id="sumWinRate">–</span>
+          </div>
+        </div>
+
+        <div class="top-performers">
+          <p class="performers-title">Top Movers</p>
+          <div id="topMovers" class="movers-list">
+            <span class="muted-txt">–</span>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+  </div>
+
+  <!-- ── Add Trade Modal ────────────────────────────────────────────────── -->
+  <div id="addTradeModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Trade</h3>
+        <button class="modal-close" id="closeAddModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Stock Symbol</label>
+            <input type="text" id="inputSymbol" placeholder="e.g. RELIANCE" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Exchange</label>
+            <select id="inputExchange">
+              <option value="auto">Auto-detect</option>
+              <option value="NS">NSE (.NS)</option>
+              <option value="BO">BSE (.BO)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>No. of Shares</label>
+            <input type="number" id="inputShares" placeholder="100" min="1" step="1" />
+          </div>
+          <div class="form-group">
+            <label>Buy Price (₹)</label>
+            <input type="number" id="inputBuyPrice" placeholder="0.00" step="0.01" min="0" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Buy Date</label>
+            <input type="date" id="inputBuyDate" />
+          </div>
+          <div class="form-group">
+            <label>Invested Amount</label>
+            <input type="text" id="inputInvested" readonly placeholder="Auto-calculated" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelAddTrade">Cancel</button>
+        <button class="btn-primary" id="confirmAddTrade">Add Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sell Modal ─────────────────────────────────────────────────────── -->
+  <div id="sellModal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Sell Trade</h3>
+        <button class="modal-close" id="closeSellModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="sellInfo"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Shares Selling</label>
+            <input type="number" id="sellSharesInput" min="1" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>Sell Price (₹)</label>
+            <input type="number" id="sellPriceInput" placeholder="0.00" step="0.01" min="0" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Sell Date</label>
+            <input type="date" id="sellDateInput" />
+          </div>
+          <div class="form-group">
+            <label>Sell Amount</label>
+            <input type="text" id="sellAmountInput" readonly placeholder="Auto-calculated" />
+          </div>
+        </div>
+        <div id="sellPreview"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelSell">Cancel</button>
+        <button class="btn-primary btn-sell-confirm" id="confirmSell">Confirm Sell</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Chatbot Widget ─────────────────────────────────────────────────── -->
+  <div id="chatbotWidget" class="chatbot-widget">
+    <div id="chatbotPanel" class="chatbot-panel hidden">
+      <div class="chatbot-header">
+        <span>AI Assistant</span>
+        <button id="closeChatbot">✕</button>
+      </div>
+      <div class="chatbot-messages" id="chatMessages"></div>
+      <div class="chatbot-input-row">
+        <input type="text" id="chatInput" placeholder="Ask about your portfolio..." />
+        <button id="chatSend">↑</button>
+      </div>
+    </div>
+    <button id="chatbotToggle" class="chatbot-toggle" title="AI Assistant">
+      <span class="chatbot-icon">✦</span>
+    </button>
+  </div>
+
+  <!-- ── Scripts (app.js imports everything else) ──────────────────────── -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
