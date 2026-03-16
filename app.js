@@ -226,6 +226,7 @@ $("confirmAddTrade").addEventListener("click", async () => {
     _updateSummary();
     _toast("Trade added!", "success");
     _fetchAndSavePrice(ref.id, symbol, exchange);
+    _scheduleNextRefresh();
   } catch (e) {
     _toast("Error: " + e.message, "error");
   } finally {
@@ -349,6 +350,7 @@ $("confirmSell").addEventListener("click", async () => {
     _renderTable();
     _updateSummary();
     _toast(ss === trade.shares ? "Trade closed!" : "Partial sell done — remaining row added!", "success");
+    _scheduleNextRefresh();
   } catch (e) {
     _toast("Error: " + e.message, "error");
   } finally {
@@ -366,6 +368,7 @@ async function _confirmDelete(tradeId) {
     _renderTable();
     _updateSummary();
     _toast("Deleted.", "info");
+    _scheduleNextRefresh();
   } catch (e) {
     _toast("Error: " + e.message, "error");
   }
@@ -468,18 +471,49 @@ async function _fetchAndSavePrice(tradeId, symbol, exchange) {
   _updateSummary();
 }
 
+function _isMarketHours() {
+  const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const day = ist.getDay();
+  const h   = ist.getHours();
+  const m   = ist.getMinutes();
+  const min = h * 60 + m;
+  return day >= 1 && day <= 5 && min >= 540 && min <= 930; // 9:00am to 3:30pm
+}
+
+function _calcInterval(openCount) {
+  if (openCount === 0) return null;
+  const raw     = (390 * openCount) / 800; // minutes per credit budget
+  const rounded = Math.ceil(raw);          // round up to be safe
+  const clamped = Math.min(Math.max(rounded, 1), 10);
+  return clamped * 60 * 1000;              // convert to ms
+}
+
 async function _refreshAllPrices() {
+  if (!_isMarketHours()) return;
   const open = trades.filter((t) => t.status === "open");
   if (open.length === 0) return;
   for (const t of open) {
     await _fetchAndSavePrice(t.id, t.symbol, t.exchange);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 800));
   }
 }
 
 function _startPriceRefresh() {
-  _refreshAllPrices();
-  priceInterval = setInterval(_refreshAllPrices, 180000);
+  // Always do an initial fetch on load regardless of market hours
+  const open = trades.filter((t) => t.status === "open");
+  if (open.length > 0) _refreshAllPrices();
+  _scheduleNextRefresh();
+}
+
+function _scheduleNextRefresh() {
+  clearInterval(priceInterval);
+  const open     = trades.filter((t) => t.status === "open");
+  const interval = _calcInterval(open.length);
+  if (!interval) return; // no open trades
+  priceInterval  = setInterval(() => {
+    _refreshAllPrices();
+    _scheduleNextRefresh(); // recalculate interval each cycle
+  }, interval);
 }
 
 // ─── Market Status ────────────────────────────────────────────────────────────

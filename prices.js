@@ -1,59 +1,35 @@
 // ─── NK Trade Tracker — Live Price Fetcher ───────────────────────────────────
-// Uses Yahoo Finance via multiple strategies with fallback
+// Uses Twelve Data API (free: 800 calls/day)
 
-const YF_QUERY1 = "https://query1.finance.yahoo.com/v8/finance/chart/";
-const YF_QUERY2 = "https://query2.finance.yahoo.com/v8/finance/chart/";
-const TIMEOUT   = 10000;
+const TWELVE_DATA_KEY = "3de7bd923b4e42e78ebc3249c62914bf";
+const TWELVE_DATA_URL = "https://api.twelvedata.com/price";
 
-// allorigins /get wraps response in { contents: "..." }
-// allorigins /raw returns raw but has CORS issues on some servers
-const STRATEGIES = [
-  (url) => "https://api.allorigins.win/get?url=" + encodeURIComponent(url),
-  (url) => "https://corsproxy.io/?" + encodeURIComponent(url),
-  (url) => "https://thingproxy.freeboard.io/fetch/" + url,
-];
+const EXCHANGE_MAP = { NS: "NSE", BO: "BSE" };
 
 export async function fetchLivePrice(symbol, preferredExchange = null) {
   const primary   = preferredExchange ?? "NS";
   const secondary = primary === "NS" ? "BO" : "NS";
 
   for (const suffix of [primary, secondary]) {
-    const result = await _tryAllStrategies(symbol, suffix);
+    const result = await _fetchPrice(symbol, EXCHANGE_MAP[suffix]);
     if (result !== null) return { price: result, exchange: suffix };
   }
 
   return { price: null, exchange: null };
 }
 
-async function _tryAllStrategies(symbol, suffix) {
-  const ticker  = symbol + "." + suffix;
-  const targets = [
-    YF_QUERY1 + ticker + "?interval=1m&range=1d",
-    YF_QUERY2 + ticker + "?interval=1m&range=1d",
-  ];
-
-  for (const target of targets) {
-    for (const buildUrl of STRATEGIES) {
-      const price = await _tryFetch(buildUrl(target), target.includes("allorigins.win/get"));
-      if (price !== null) return price;
-    }
-  }
-  return null;
-}
-
-async function _tryFetch(url, isWrapped = false) {
+async function _fetchPrice(symbol, exchange) {
   try {
-    const ctrl  = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
-    const res   = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(timer);
+    const params = new URLSearchParams({
+      symbol: symbol + ":" + exchange,
+      apikey: TWELVE_DATA_KEY,
+    });
+    const res = await fetch(TWELVE_DATA_URL + "?" + params.toString());
     if (!res.ok) return null;
-
-    const raw  = await res.json();
-    // allorigins /get wraps in { contents: "..." }
-    const data = isWrapped ? JSON.parse(raw.contents) : raw;
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    return (price && price > 0) ? parseFloat(price.toFixed(2)) : null;
+    const data = await res.json();
+    if (data.code || !data.price) return null;
+    const price = parseFloat(data.price);
+    return price > 0 ? parseFloat(price.toFixed(2)) : null;
   } catch {
     return null;
   }
