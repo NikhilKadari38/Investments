@@ -39,7 +39,7 @@ async function _handleLogin() {
   try {
     const snap = await getDocs(collection(db, AUTH_COLLECTION));
     let ok = false;
-    snap.forEach((d) => { if (d.data().user === "Nikhil38" && d.data().password === pw) ok = true; });
+    snap.forEach((d) => { if (d.data().user === "nikhil" && d.data().password === pw) ok = true; });
     if (ok) {
       sessionStorage.setItem("nktt_ok", "1");
       $("loginOverlay").classList.add("hidden");
@@ -471,12 +471,15 @@ async function _fetchAndSavePrice(tradeId, symbol, exchange) {
 async function _refreshAllPrices() {
   const open = trades.filter((t) => t.status === "open");
   if (open.length === 0) return;
-  await Promise.allSettled(open.map((t) => _fetchAndSavePrice(t.id, t.symbol, t.exchange)));
+  for (const t of open) {
+    await _fetchAndSavePrice(t.id, t.symbol, t.exchange);
+    await new Promise(r => setTimeout(r, 1200));
+  }
 }
 
 function _startPriceRefresh() {
   _refreshAllPrices();
-  priceInterval = setInterval(_refreshAllPrices, 60000);
+  priceInterval = setInterval(_refreshAllPrices, 180000);
 }
 
 // ─── Market Status ────────────────────────────────────────────────────────────
