@@ -39,7 +39,7 @@ async function _handleLogin() {
   try {
     const snap = await getDocs(collection(db, AUTH_COLLECTION));
     let ok = false;
-    snap.forEach((d) => { if (d.data().user === "nikhil" && d.data().password === pw) ok = true; });
+    snap.forEach((d) => { if (d.data().user === "Nikhil38" && d.data().password === pw) ok = true; });
     if (ok) {
       sessionStorage.setItem("nktt_ok", "1");
       $("loginOverlay").classList.add("hidden");
