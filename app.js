@@ -6,7 +6,6 @@ import {
   query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { fetchLivePrice } from "./prices.js";
-import { initChatbot }    from "./chatbot.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
@@ -191,7 +190,6 @@ async function _initApp() {
   await _loadTrades();
   _renderTable();
   _updateSummary();
-  initChatbot(_getPortfolioContext);
   _startPriceRefresh();
 }
 
@@ -626,28 +624,6 @@ function _renderMovers() {
       '<span class="' + (pct >= 0 ? "profit" : "loss") + '">' + _fmtPct(pct) + '</span>' +
       '</div>';
   }).join("");
-}
-
-// ─── Portfolio Context for Chatbot ────────────────────────────────────────────
-function _getPortfolioContext() {
-  const open   = trades.filter((t) => t.status === "open");
-  const closed = trades.filter((t) => t.status === "closed");
-  const totalInvested = open.reduce((s, t) => s + t.investedAmount, 0);
-  const realized      = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
-  const wins          = closed.filter((t) => (t.returns ?? 0) > 0).length;
-
-  const openStr = open.map((t) =>
-    t.symbol + "(" + t.shares + "sh @ ₹" + t.buyPrice +
-    (t.livePrice ? ", live ₹" + t.livePrice : "") + ")"
-  ).join(", ");
-
-  return [
-    "Portfolio: " + open.length + " open, " + closed.length + " closed trades.",
-    "Active invested: ₹" + totalInvested.toLocaleString("en-IN"),
-    "Realized returns: ₹" + realized.toLocaleString("en-IN"),
-    closed.length > 0 ? "Win rate: " + Math.round(wins / closed.length * 100) + "%" : "",
-    open.length > 0 ? "Open positions: " + openStr : "No open positions."
-  ].filter(Boolean).join("\n");
 }
 
 // ─── Live Prices ──────────────────────────────────────────────────────────────
