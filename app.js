@@ -192,36 +192,62 @@ function _initBgCanvas() {
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // dot grid — visible amber dots
-    const gs = 48;
+    // animated dot grid — each dot pulses individually
+    const gs = 52;
     for (let x = gs; x < W; x += gs) {
       for (let y = gs; y < H; y += gs) {
-        const a = 0.12 + Math.sin(t * 0.3 + x * 0.01 + y * 0.01) * 0.04;
-        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(224,123,0,' + a + ')'; ctx.fill();
+        const wave = Math.sin(t * 1.2 + x * 0.03 + y * 0.03);
+        const a = 0.18 + wave * 0.12;
+        const r = 1.8 + wave * 0.8;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(224,123,0,' + a + ')';
+        ctx.fill();
       }
     }
 
-    // large soft bubbles
+    // large drifting orbs — same energy as dark theme
     bubbles.forEach(b => {
-      b.x += b.vx; b.y += b.vy; b.phase += 0.008;
-      if (b.x < -b.r) b.x = W+b.r; if (b.x > W+b.r) b.x = -b.r;
-      if (b.y < -b.r) b.y = H+b.r; if (b.y > H+b.r) b.y = -b.r;
-      const pulse = 0.08 + Math.sin(b.phase) * 0.04;
+      b.x += b.vx; b.y += b.vy; b.phase += 0.018;
+      if (b.x < -b.r) b.x = W + b.r; if (b.x > W + b.r) b.x = -b.r;
+      if (b.y < -b.r) b.y = H + b.r; if (b.y > H + b.r) b.y = -b.r;
+      const pulse = 0.16 + Math.sin(b.phase) * 0.08;
       const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
       grad.addColorStop(0,   'rgba(' + b.color + ',' + pulse + ')');
-      grad.addColorStop(0.6, 'rgba(' + b.color + ',' + (pulse*0.3) + ')');
+      grad.addColorStop(0.5, 'rgba(' + b.color + ',' + (pulse * 0.4) + ')');
       grad.addColorStop(1,   'rgba(' + b.color + ',0)');
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
     });
 
-    // decorative circles — bold
-    ctx.strokeStyle = 'rgba(224,123,0,0.14)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(W*0.9, H*0.85, 110, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(W*0.9, H*0.85, 65, 0, Math.PI*2); ctx.stroke();
-    ctx.strokeStyle = 'rgba(29,111,191,0.10)';
-    ctx.beginPath(); ctx.arc(W*0.06, H*0.78, 80, 0, Math.PI*2); ctx.stroke();
+    // floating rising sparks — amber version
+    sparks.forEach(p => {
+      p.x += p.vx * 0.6; p.y += p.vy * 0.7; p.life += 0.009;
+      if (p.life > p.maxLife) {
+        p.x = Math.random() * W; p.y = H + 10;
+        p.vx = (Math.random() - 0.5) * 0.8; p.vy = -Math.random() * 0.5 - 0.15;
+        p.life = 0; p.maxLife = 0.7 + Math.random() * 0.9;
+      }
+      const alpha = Math.sin((p.life / p.maxLife) * Math.PI) * 0.55;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
+      ctx.fill();
+    });
+
+    // rotating decorative rings
+    const ringX = W * 0.88, ringY = H * 0.82;
+    [100, 62, 30].forEach((r, i) => {
+      const a = 0.10 + Math.sin(t * 0.5 + i) * 0.05;
+      ctx.strokeStyle = 'rgba(224,123,0,' + a + ')';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ringX, ringY, r, 0, Math.PI * 2); ctx.stroke();
+    });
+    const ringX2 = W * 0.07, ringY2 = H * 0.75;
+    [72, 42].forEach((r, i) => {
+      const a = 0.08 + Math.sin(t * 0.4 + i + 1) * 0.04;
+      ctx.strokeStyle = 'rgba(29,111,191,' + a + ')';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ringX2, ringY2, r, 0, Math.PI * 2); ctx.stroke();
+    });
   }
 
   function draw() {
