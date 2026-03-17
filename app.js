@@ -86,8 +86,8 @@ async function _showApp() {
 function _initBgCanvas() {
   const canvas = document.getElementById('bgCanvas');
   if (!canvas) return;
+  const ctx = canvas.getContext('2d');
 
-  // size canvas to fill the fixed bg-canvas div
   function resize() {
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -95,96 +95,82 @@ function _initBgCanvas() {
   resize();
   window.addEventListener('resize', resize);
 
-  const ctx = canvas.getContext('2d');
-
   function isDark() {
     return document.documentElement.getAttribute('data-theme') !== 'light';
   }
 
-  // ── DARK: animated neon grid + large glowing orbs + shooting sparks ──────
-  const orbs = Array.from({ length: 5 }, (_, i) => ({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    r: 120 + Math.random() * 180,
-    vx: (Math.random() - 0.5) * 0.4,
-    vy: (Math.random() - 0.5) * 0.4,
-    phase: Math.random() * Math.PI * 2,
-    color: i % 2 === 0 ? '255,230,0' : '57,255,110'
-  }));
+  // ── DARK: scrolling matrix rain of financial symbols ──────────────────────
+  const SYMBOLS = ['₹','%','+','-','▲','▼','0','1','2','3','4','5','6','7','8','9'];
+  const COLS_DARK = [];
+  function initDark() {
+    COLS_DARK.length = 0;
+    const cols = Math.floor(canvas.width / 22);
+    for (let i = 0; i < cols; i++) {
+      COLS_DARK.push({
+        x: i * 22 + 11,
+        y: Math.random() * -canvas.height,
+        speed: 0.4 + Math.random() * 0.8,
+        chars: Array.from({length: 18}, () => ({
+          c: SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
+          opacity: Math.random()
+        })),
+        headOpacity: 0.9 + Math.random() * 0.1,
+        swapTimer: 0
+      });
+    }
+  }
+  initDark();
+  window.addEventListener('resize', initDark);
 
-  const sparks = Array.from({ length: 22 }, () => ({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    vx: (Math.random() - 0.5) * 0.8,
-    vy: -Math.random() * 0.6 - 0.2,
-    life: Math.random(),
-    maxLife: 0.6 + Math.random() * 0.8,
-    size: 1.5 + Math.random() * 2.5
-  }));
-
-  // ── LIGHT: floating amber + blue bubbles + dot grid ──────────────────────
-  const bubbles = Array.from({ length: 12 }, (_, i) => ({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    r: 60 + Math.random() * 120,
-    vx: (Math.random() - 0.5) * 0.25,
-    vy: (Math.random() - 0.5) * 0.25,
-    phase: Math.random() * Math.PI * 2,
-    color: i < 8 ? '224,123,0' : '29,111,191'
+  // ── LIGHT: flowing sine wave lines ────────────────────────────────────────
+  const WAVES = Array.from({length: 6}, (_, i) => ({
+    amp:    40 + i * 18,
+    freq:   0.006 + i * 0.002,
+    speed:  0.008 + i * 0.003,
+    phase:  (i / 6) * Math.PI * 2,
+    yBase:  0,
+    color:  i % 2 === 0 ? '224,123,0' : '29,111,191',
+    width:  1.2 + i * 0.3
   }));
 
   let t = 0;
 
   function drawDark() {
     const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+    // fade trail
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0, 0, W, H);
 
-    // animated grid — lines pulse in opacity
-    const gs = 80;
-    const gridAlpha = 0.04 + Math.sin(t * 0.4) * 0.02;
-    ctx.strokeStyle = 'rgba(255,230,0,' + gridAlpha + ')';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += gs) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y < H; y += gs) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
+    ctx.font = '13px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
 
-    // glowing orbs — large, very visible
-    orbs.forEach(o => {
-      o.x += o.vx; o.y += o.vy; o.phase += 0.012;
-      if (o.x < -o.r) o.x = W + o.r; if (o.x > W + o.r) o.x = -o.r;
-      if (o.y < -o.r) o.y = H + o.r; if (o.y > H + o.r) o.y = -o.r;
-      const pulse = 0.07 + Math.sin(o.phase) * 0.04;
-      const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-      grad.addColorStop(0,   'rgba(' + o.color + ',' + pulse + ')');
-      grad.addColorStop(0.5, 'rgba(' + o.color + ',' + (pulse * 0.4) + ')');
-      grad.addColorStop(1,   'rgba(' + o.color + ',0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
-    });
-
-    // corner bracket decorations — static, bold
-    ctx.strokeStyle = 'rgba(255,230,0,0.35)';
-    ctx.lineWidth = 2;
-    const bl = 36;
-    [[20,20],[W-20,20],[20,H-20],[W-20,H-20]].forEach(([cx,cy]) => {
-      const sx = cx < W/2 ? 1 : -1, sy = cy < H/2 ? 1 : -1;
-      ctx.beginPath(); ctx.moveTo(cx, cy+sy*bl); ctx.lineTo(cx,cy); ctx.lineTo(cx+sx*bl,cy); ctx.stroke();
-    });
-
-    // rising sparks
-    sparks.forEach(p => {
-      p.x += p.vx; p.y += p.vy; p.life += 0.008;
-      if (p.life > p.maxLife) {
-        p.x = Math.random() * W; p.y = H + 10;
-        p.vx = (Math.random()-0.5)*0.8; p.vy = -Math.random()*0.6-0.2;
-        p.life = 0; p.maxLife = 0.6 + Math.random()*0.8;
+    COLS_DARK.forEach(col => {
+      col.y += col.speed;
+      col.swapTimer++;
+      if (col.swapTimer > 8) {
+        col.swapTimer = 0;
+        const ri = Math.floor(Math.random() * col.chars.length);
+        col.chars[ri].c = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
       }
-      const alpha = Math.sin((p.life / p.maxLife) * Math.PI) * 0.7;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')'; ctx.fill();
+      if (col.y > H + 200) {
+        col.y = -col.chars.length * 18;
+        col.speed = 0.4 + Math.random() * 0.8;
+      }
+
+      col.chars.forEach((ch, j) => {
+        const cy = col.y + j * 18;
+        if (cy < -18 || cy > H + 18) return;
+
+        const isHead = j === col.chars.length - 1;
+        if (isHead) {
+          ctx.fillStyle = 'rgba(255,255,220,' + col.headOpacity + ')';
+        } else {
+          const fade = (j / col.chars.length);
+          const alpha = fade * 0.55;
+          ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')';
+        }
+        ctx.fillText(ch.c, col.x, cy);
+      });
     });
   }
 
@@ -192,70 +178,34 @@ function _initBgCanvas() {
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // animated dot grid — each dot pulses individually
-    const gs = 52;
-    for (let x = gs; x < W; x += gs) {
-      for (let y = gs; y < H; y += gs) {
-        const wave = Math.sin(t * 1.2 + x * 0.03 + y * 0.03);
-        const a = 0.18 + wave * 0.12;
-        const r = 1.8 + wave * 0.8;
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(224,123,0,' + a + ')';
-        ctx.fill();
+    // evenly spread waves across full height
+    const gap = H / (WAVES.length + 1);
+
+    WAVES.forEach((wave, i) => {
+      wave.phase += wave.speed;
+      const yBase = gap * (i + 1);
+
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 3) {
+        const y = yBase + Math.sin(x * wave.freq + wave.phase) * wave.amp;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
-    }
-
-    // large drifting orbs — same energy as dark theme
-    bubbles.forEach(b => {
-      b.x += b.vx; b.y += b.vy; b.phase += 0.018;
-      if (b.x < -b.r) b.x = W + b.r; if (b.x > W + b.r) b.x = -b.r;
-      if (b.y < -b.r) b.y = H + b.r; if (b.y > H + b.r) b.y = -b.r;
-      const pulse = 0.16 + Math.sin(b.phase) * 0.08;
-      const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-      grad.addColorStop(0,   'rgba(' + b.color + ',' + pulse + ')');
-      grad.addColorStop(0.5, 'rgba(' + b.color + ',' + (pulse * 0.4) + ')');
-      grad.addColorStop(1,   'rgba(' + b.color + ',0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+      const alpha = 0.10 + Math.sin(t * 0.4 + i) * 0.04;
+      ctx.strokeStyle = 'rgba(' + wave.color + ',' + alpha + ')';
+      ctx.lineWidth = wave.width;
+      ctx.stroke();
     });
 
-    // floating rising sparks — amber version
-    sparks.forEach(p => {
-      p.x += p.vx * 0.6; p.y += p.vy * 0.7; p.life += 0.009;
-      if (p.life > p.maxLife) {
-        p.x = Math.random() * W; p.y = H + 10;
-        p.vx = (Math.random() - 0.5) * 0.8; p.vy = -Math.random() * 0.5 - 0.15;
-        p.life = 0; p.maxLife = 0.7 + Math.random() * 0.9;
-      }
-      const alpha = Math.sin((p.life / p.maxLife) * Math.PI) * 0.55;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
-      ctx.fill();
-    });
-
-    // rotating decorative rings
-    const ringX = W * 0.88, ringY = H * 0.82;
-    [100, 62, 30].forEach((r, i) => {
-      const a = 0.10 + Math.sin(t * 0.5 + i) * 0.05;
-      ctx.strokeStyle = 'rgba(224,123,0,' + a + ')';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(ringX, ringY, r, 0, Math.PI * 2); ctx.stroke();
-    });
-    const ringX2 = W * 0.07, ringY2 = H * 0.75;
-    [72, 42].forEach((r, i) => {
-      const a = 0.08 + Math.sin(t * 0.4 + i + 1) * 0.04;
-      ctx.strokeStyle = 'rgba(29,111,191,' + a + ')';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(ringX2, ringY2, r, 0, Math.PI * 2); ctx.stroke();
-    });
+    t += 0.016;
   }
 
+  // clear canvas once before starting
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   function draw() {
-    t += 0.016;
     if (isDark()) drawDark(); else drawLight();
     requestAnimationFrame(draw);
   }
-
   draw();
 }
 
