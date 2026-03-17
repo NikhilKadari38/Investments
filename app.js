@@ -35,18 +35,7 @@ document.addEventListener("click", (e) => {
   e.target.textContent = next === "dark" ? "🌙" : "☀️";
 });
 
-// ─── Session Check ────────────────────────────────────────────────────────────
-if (sessionStorage.getItem("nktt_ok")) _showApp();
-
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-$("loginBtn").addEventListener("click", _handleLogin);
-$("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
-$("logoutBtn").addEventListener("click", () => {
-  sessionStorage.removeItem("nktt_ok");
-  clearInterval(priceInterval);
-  location.reload();
-});
-
 async function _handleLogin() {
   const pw  = $("loginPassword").value.trim();
   const btn = $("loginBtn");
@@ -736,6 +725,17 @@ function _toast(msg, type = "info") {
     setTimeout(() => t.remove(), 280);
   }, 2600);
 }
+
+// ─── Startup ─────────────────────────────────────────────────────────────────
+// Run after all functions are defined
+$("loginBtn").addEventListener("click", _handleLogin);
+$("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
+$("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("nktt_ok");
+  clearInterval(priceInterval);
+  location.reload();
+});
+if (sessionStorage.getItem("nktt_ok")) _showApp();
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function _fmt(val) {
