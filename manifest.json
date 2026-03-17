@@ -1,0 +1,12 @@
+{
+  "name": "NK Trade Tracker",
+  "short_name": "Trade Tracker",
+  "description": "NK's personal Indian stock market investment tracker",
+  "start_url": "/Investments/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#FFE600",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
