@@ -164,11 +164,11 @@
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
-            <label>Stock Symbol</label>
+            <label for="inputSymbol">Stock Symbol</label>
             <input type="text" id="inputSymbol" placeholder="e.g. RELIANCE" autocomplete="off" />
           </div>
           <div class="form-group">
-            <label>Exchange</label>
+            <label for="inputExchange">Exchange</label>
             <select id="inputExchange">
               <option value="auto">Auto-detect</option>
               <option value="NS">NSE (.NS)</option>
@@ -178,21 +178,21 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>No. of Shares</label>
+            <label for="inputShares">No. of Shares</label>
             <input type="number" id="inputShares" placeholder="100" min="1" step="1" />
           </div>
           <div class="form-group">
-            <label>Buy Price (₹)</label>
+            <label for="inputBuyPrice">Buy Price (₹)</label>
             <input type="number" id="inputBuyPrice" placeholder="0.00" step="0.01" min="0" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Buy Date</label>
+            <label for="inputBuyDate">Buy Date</label>
             <input type="date" id="inputBuyDate" />
           </div>
           <div class="form-group">
-            <label>Invested Amount</label>
+            <label for="inputInvested">Invested Amount</label>
             <input type="text" id="inputInvested" readonly placeholder="Auto-calculated" />
           </div>
         </div>
@@ -215,21 +215,21 @@
         <div id="sellInfo"></div>
         <div class="form-row">
           <div class="form-group">
-            <label>Shares Selling</label>
+            <label for="sellSharesInput">Shares Selling</label>
             <input type="number" id="sellSharesInput" min="1" placeholder="0" />
           </div>
           <div class="form-group">
-            <label>Sell Price (₹)</label>
+            <label for="sellPriceInput">Sell Price (₹)</label>
             <input type="number" id="sellPriceInput" placeholder="0.00" step="0.01" min="0" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Sell Date</label>
+            <label for="sellDateInput">Sell Date</label>
             <input type="date" id="sellDateInput" />
           </div>
           <div class="form-group">
-            <label>Sell Amount</label>
+            <label for="sellAmountInput">Sell Amount</label>
             <input type="text" id="sellAmountInput" readonly placeholder="Auto-calculated" />
           </div>
         </div>
