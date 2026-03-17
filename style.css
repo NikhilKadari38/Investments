@@ -655,3 +655,14 @@ a { color: var(--accent); text-decoration: none; }
   .trade-cards { display: none; }
   .fab-add     { display: none; }
 }
+
+/* ── Login logo SVG colors ── */
+.login-logo svg .axis { stroke: var(--accent); }
+.login-logo svg .line { stroke: var(--profit); }
+.login-logo svg .dot  { fill: var(--profit); }
+
+/* ── Mobile login fixes ── */
+@media (max-width: 768px) {
+  .login-overlay { align-items: center; padding: 20px; overflow-y: auto; }
+  .login-box { width: 100%; max-width: 360px; padding: 28px 22px; }
+}

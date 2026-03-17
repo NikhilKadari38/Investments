@@ -50,27 +50,33 @@ $("logoutBtn").addEventListener("click", () => {
 async function _handleLogin() {
   const pw  = $("loginPassword").value.trim();
   const btn = $("loginBtn");
-  if (!pw) return;
+  const err = $("loginError");
+  if (!pw) { err.textContent = "Please enter your password."; return; }
+
   btn.textContent = "Checking...";
   btn.disabled    = true;
+  err.textContent = "";
 
   try {
     const snap = await getDocs(collection(db, AUTH_COLLECTION));
     let ok = false;
-    snap.forEach((d) => { if (d.data().user === "nikhil" && d.data().password === pw) ok = true; });
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data.user === "nikhil" && data.password === pw) ok = true;
+    });
     if (ok) {
       sessionStorage.setItem("nktt_ok", "1");
-      $("loginOverlay").classList.add("hidden");
       _showApp();
     } else {
-      $("loginError").textContent = "Incorrect password.";
-      btn.textContent = "Access";
-      btn.disabled    = false;
+      err.textContent  = "Incorrect password.";
+      btn.textContent  = "Access";
+      btn.disabled     = false;
     }
   } catch (e) {
-    $("loginError").textContent = "Firebase error — check config.";
-    btn.textContent = "Access";
-    btn.disabled    = false;
+    console.error("Login error:", e);
+    err.textContent  = "Connection error: " + (e.message || "check Firebase config");
+    btn.textContent  = "Access";
+    btn.disabled     = false;
   }
 }
 
