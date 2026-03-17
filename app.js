@@ -259,6 +259,12 @@ function _renderTable() {
       ? '<span class="live-val">' + _fmt(trade.livePrice) + '</span>'
       : '<span class="dash-val">–</span>';
 
+    const dayPct     = trade.dayChangePct;
+    const dayClass   = dayPct > 0 ? "profit" : dayPct < 0 ? "loss" : "";
+    const dayCell    = (trade.status === "open" && dayPct !== null && dayPct !== undefined)
+      ? '<span class="' + dayClass + '">' + (dayPct >= 0 ? "+" : "") + dayPct + "%</span>"
+      : '<span class="dash-val">–</span>';
+
     const sellCell = isClosed
       ? '<span class="td-mono">' + _fmt(trade.sellPrice) + '</span>'
       : '<button class="btn-sell-row" data-id="' + trade.id + '">Sell</button>';
@@ -278,6 +284,7 @@ function _renderTable() {
       '<td class="td-date">'   + _fmtDate(trade.buyDate) + '</td>' +
       '<td class="td-mono">'   + _fmt(trade.investedAmount) + '</td>' +
       '<td class="td-live">'   + liveCell + '</td>' +
+      '<td class="td-mono">'   + dayCell + '</td>' +
       '<td>'                   + currValCell + '</td>' +
       '<td class="td-sell">'   + sellCell + '</td>' +
       '<td class="td-date">'   + (trade.sellDate ? _fmtDate(trade.sellDate) : '<span class="dash-val">–</span>') + '</td>' +
@@ -353,6 +360,7 @@ function _renderCards(filtered) {
         '<div class="tc-field"><span class="tc-label">Buy Price</span><span class="tc-val">' + _fmt(trade.buyPrice) + '</span></div>' +
         '<div class="tc-field"><span class="tc-label">Invested</span><span class="tc-val">' + _fmt(trade.investedAmount) + '</span></div>' +
         '<div class="tc-field"><span class="tc-label">Live Price</span><span class="tc-val live">' + (trade.livePrice ? _fmt(trade.livePrice) : "–") + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">Day Change</span><span class="tc-val ' + (trade.status === "open" && trade.dayChangePct !== null && trade.dayChangePct !== undefined ? (trade.dayChangePct >= 0 ? "profit" : "loss") : "") + '">' + (trade.status === "open" && trade.dayChangePct !== null && trade.dayChangePct !== undefined ? (trade.dayChangePct >= 0 ? "+" : "") + trade.dayChangePct + "%" : "–") + '</span></div>' +
         '<div class="tc-field"><span class="tc-label">Returns</span><span class="tc-val ' + plClass + '">' + (plVal !== null ? _fmt(plVal) : "–") + '</span></div>' +
         '<div class="tc-field"><span class="tc-label">P/L %</span><span class="tc-val ' + plClass + '">' + (plPct !== null ? _fmtPct(plPct) : "–") + '</span></div>' +
       '</div>' +
@@ -578,9 +586,6 @@ function _updateSummary() {
   const unrealPct      = activeInvested > 0 ? (unrealized / activeInvested) * 100 : 0;
   const realized       = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
   const wins           = closed.filter((t) => (t.returns ?? 0) > 0).length;
-  const winRate        = closed.length > 0
-    ? Math.round((wins / closed.length) * 100) + "%"
-    : "–";
 
   $("sumActiveInvested").textContent = _fmt(activeInvested);
   $("sumCurrentValue").textContent   = _fmt(currentValue);
@@ -597,7 +602,7 @@ function _updateSummary() {
   rEl.className     = "summary-value " + (realized >= 0 ? "profit" : "loss");
 
   $("sumTotalTrades").textContent = trades.length;
-  $("sumWinRate").textContent     = winRate;
+
 
   _renderMovers();
 }
@@ -647,11 +652,12 @@ function _getPortfolioContext() {
 
 // ─── Live Prices ──────────────────────────────────────────────────────────────
 async function _fetchAndSavePrice(tradeId, symbol, exchange) {
-  const { price, exchange: detected } = await fetchLivePrice(symbol, exchange);
+  const { price, dayChangePct, exchange: detected } = await fetchLivePrice(symbol, exchange);
   const idx = trades.findIndex((t) => t.id === tradeId);
   if (idx === -1) return;
 
-  trades[idx].livePrice = price;
+  trades[idx].livePrice    = price;
+  trades[idx].dayChangePct = dayChangePct;
   const upd = { livePrice: price };
   if (detected && !trades[idx].exchange) {
     trades[idx].exchange = detected;

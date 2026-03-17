@@ -9,10 +9,10 @@ export async function fetchLivePrice(symbol, preferredExchange = null) {
 
   for (const suffix of [primary, secondary]) {
     const result = await _fetchPrice(symbol, suffix);
-    if (result !== null) return { price: result, exchange: suffix };
+    if (result !== null) return { ...result, exchange: suffix };
   }
 
-  return { price: null, exchange: null };
+  return { price: null, dayChangePct: null, exchange: null };
 }
 
 async function _fetchPrice(symbol, suffix) {
@@ -21,9 +21,24 @@ async function _fetchPrice(symbol, suffix) {
     const url    = WORKER_URL + "?symbol=" + encodeURIComponent(ticker);
     const res    = await fetch(url);
     if (!res.ok) return null;
-    const data  = await res.json();
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    return (price && price > 0) ? parseFloat(price.toFixed(2)) : null;
+
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+
+    const price = meta.regularMarketPrice;
+    if (!price || price <= 0) return null;
+
+    // Day % change using previousClose
+    const prev         = meta.chartPreviousClose || meta.previousClose;
+    const dayChangePct = prev && prev > 0
+      ? parseFloat((((price - prev) / prev) * 100).toFixed(2))
+      : null;
+
+    return {
+      price:       parseFloat(price.toFixed(2)),
+      dayChangePct
+    };
   } catch {
     return null;
   }
