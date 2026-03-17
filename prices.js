@@ -1,35 +1,39 @@
 // ─── NK Trade Tracker — Live Price Fetcher ───────────────────────────────────
-// Uses Twelve Data API (free: 800 calls/day)
+// Uses personal Cloudflare Worker to fetch Yahoo Finance prices
+// Worker URL: https://nk-price-proxy.lotuswhite9392.workers.dev
 
-const TWELVE_DATA_KEY = "3de7bd923b4e42e78ebc3249c62914bf";
-const TWELVE_DATA_URL = "https://api.twelvedata.com/price";
+const WORKER_URL = "https://nk-price-proxy.lotuswhite9392.workers.dev";
 
-const EXCHANGE_MAP = { NS: "NSE", BO: "BSE" };
-
+/**
+ * Fetch the live market price for a stock symbol.
+ * Tries NSE first, then BSE as fallback.
+ *
+ * @param {string}      symbol           — e.g. "RELIANCE", "TATAMOTORS"
+ * @param {string|null} preferredExchange — "NS" | "BO" | null (auto-detect)
+ * @returns {Promise<{ price: number|null, exchange: string|null }>}
+ */
 export async function fetchLivePrice(symbol, preferredExchange = null) {
   const primary   = preferredExchange ?? "NS";
   const secondary = primary === "NS" ? "BO" : "NS";
 
   for (const suffix of [primary, secondary]) {
-    const result = await _fetchPrice(symbol, EXCHANGE_MAP[suffix]);
+    const result = await _fetchPrice(symbol, suffix);
     if (result !== null) return { price: result, exchange: suffix };
   }
 
   return { price: null, exchange: null };
 }
 
-async function _fetchPrice(symbol, exchange) {
+async function _fetchPrice(symbol, suffix) {
   try {
-    const params = new URLSearchParams({
-      symbol: symbol + ":" + exchange,
-      apikey: TWELVE_DATA_KEY,
-    });
-    const res = await fetch(TWELVE_DATA_URL + "?" + params.toString());
+    const ticker = symbol + "." + suffix;
+    const url    = WORKER_URL + "?symbol=" + encodeURIComponent(ticker);
+    const res    = await fetch(url);
     if (!res.ok) return null;
-    const data = await res.json();
-    if (data.code || !data.price) return null;
-    const price = parseFloat(data.price);
-    return price > 0 ? parseFloat(price.toFixed(2)) : null;
+
+    const data  = await res.json();
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    return (price && price > 0) ? parseFloat(price.toFixed(2)) : null;
   } catch {
     return null;
   }
