@@ -305,7 +305,7 @@ function _renderCards(filtered) {
   container.innerHTML = "";
 
   if (filtered.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:40px 0;font-size:13px;">No trades yet — tap <strong style='color:var(--accent)'>+ Add Trade</strong> below</p>';
+    container.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:40px 0;font-size:13px;">No trades yet — tap <strong style="color:var(--accent)">+ Add Trade</strong> below</p>';
     return;
   }
 
