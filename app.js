@@ -86,107 +86,151 @@ async function _showApp() {
 function _initBgCanvas() {
   const canvas = document.getElementById('bgCanvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let W, H, particles = [], animId;
 
+  // size canvas to fill the fixed bg-canvas div
   function resize() {
-    W = canvas.width  = canvas.offsetWidth;
-    H = canvas.height = canvas.offsetHeight;
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const ctx = canvas.getContext('2d');
 
   function isDark() {
     return document.documentElement.getAttribute('data-theme') !== 'light';
   }
 
-  function initParticles() {
-    particles = Array.from({ length: 38 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      r: Math.random() * 1.4 + 0.4,
-      a: Math.random()
-    }));
-  }
+  // ── DARK: animated neon grid + large glowing orbs + shooting sparks ──────
+  const orbs = Array.from({ length: 5 }, (_, i) => ({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    r: 120 + Math.random() * 180,
+    vx: (Math.random() - 0.5) * 0.4,
+    vy: (Math.random() - 0.5) * 0.4,
+    phase: Math.random() * Math.PI * 2,
+    color: i % 2 === 0 ? '255,230,0' : '57,255,110'
+  }));
+
+  const sparks = Array.from({ length: 22 }, () => ({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    vx: (Math.random() - 0.5) * 0.8,
+    vy: -Math.random() * 0.6 - 0.2,
+    life: Math.random(),
+    maxLife: 0.6 + Math.random() * 0.8,
+    size: 1.5 + Math.random() * 2.5
+  }));
+
+  // ── LIGHT: floating amber + blue bubbles + dot grid ──────────────────────
+  const bubbles = Array.from({ length: 12 }, (_, i) => ({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    r: 60 + Math.random() * 120,
+    vx: (Math.random() - 0.5) * 0.25,
+    vy: (Math.random() - 0.5) * 0.25,
+    phase: Math.random() * Math.PI * 2,
+    color: i < 8 ? '224,123,0' : '29,111,191'
+  }));
+
+  let t = 0;
 
   function drawDark() {
+    const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // subtle grid
-    ctx.strokeStyle = 'rgba(255,230,0,0.025)';
+    // animated grid — lines pulse in opacity
+    const gs = 80;
+    const gridAlpha = 0.04 + Math.sin(t * 0.4) * 0.02;
+    ctx.strokeStyle = 'rgba(255,230,0,' + gridAlpha + ')';
     ctx.lineWidth = 1;
-    const gs = 72;
-    for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    for (let x = 0; x < W; x += gs) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += gs) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
 
-    // corner brackets
-    const bl = 28, bw = 1.5;
-    ctx.strokeStyle = 'rgba(255,230,0,0.18)'; ctx.lineWidth = bw;
-    [[18,18],[W-18,18],[18,H-18],[W-18,H-18]].forEach(([cx,cy]) => {
-      const sx = cx === 18 ? 1 : -1;
-      const sy = cy === 18 ? 1 : -1;
-      ctx.beginPath(); ctx.moveTo(cx, cy + sy*bl); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx*bl, cy); ctx.stroke();
+    // glowing orbs — large, very visible
+    orbs.forEach(o => {
+      o.x += o.vx; o.y += o.vy; o.phase += 0.012;
+      if (o.x < -o.r) o.x = W + o.r; if (o.x > W + o.r) o.x = -o.r;
+      if (o.y < -o.r) o.y = H + o.r; if (o.y > H + o.r) o.y = -o.r;
+      const pulse = 0.07 + Math.sin(o.phase) * 0.04;
+      const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+      grad.addColorStop(0,   'rgba(' + o.color + ',' + pulse + ')');
+      grad.addColorStop(0.5, 'rgba(' + o.color + ',' + (pulse * 0.4) + ')');
+      grad.addColorStop(1,   'rgba(' + o.color + ',0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
     });
 
-    // floating neon particles
-    particles.forEach(p => {
-      p.a += 0.008;
-      const alpha = (Math.sin(p.a) + 1) / 2 * 0.5;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')';
-      ctx.fill();
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
-      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    // corner bracket decorations — static, bold
+    ctx.strokeStyle = 'rgba(255,230,0,0.35)';
+    ctx.lineWidth = 2;
+    const bl = 36;
+    [[20,20],[W-20,20],[20,H-20],[W-20,H-20]].forEach(([cx,cy]) => {
+      const sx = cx < W/2 ? 1 : -1, sy = cy < H/2 ? 1 : -1;
+      ctx.beginPath(); ctx.moveTo(cx, cy+sy*bl); ctx.lineTo(cx,cy); ctx.lineTo(cx+sx*bl,cy); ctx.stroke();
+    });
+
+    // rising sparks
+    sparks.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life += 0.008;
+      if (p.life > p.maxLife) {
+        p.x = Math.random() * W; p.y = H + 10;
+        p.vx = (Math.random()-0.5)*0.8; p.vy = -Math.random()*0.6-0.2;
+        p.life = 0; p.maxLife = 0.6 + Math.random()*0.8;
+      }
+      const alpha = Math.sin((p.life / p.maxLife) * Math.PI) * 0.7;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')'; ctx.fill();
     });
   }
 
   function drawLight() {
+    const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // dot grid
-    const gs = 60;
+    // dot grid — visible amber dots
+    const gs = 48;
     for (let x = gs; x < W; x += gs) {
       for (let y = gs; y < H; y += gs) {
-        const alpha = 0.06 + (y / H) * 0.04;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
-        ctx.fill();
+        const a = 0.12 + Math.sin(t * 0.3 + x * 0.01 + y * 0.01) * 0.04;
+        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(224,123,0,' + a + ')'; ctx.fill();
       }
     }
 
-    // faint decorative circles
-    [[W * 0.88, H * 0.85, 90],[W * 0.88, H * 0.85, 55],[0.06*W, H*0.75, 70]].forEach(([cx,cy,r], i) => {
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.strokeStyle = i < 2 ? 'rgba(224,123,0,0.07)' : 'rgba(29,111,191,0.06)';
-      ctx.lineWidth = 1; ctx.stroke();
+    // large soft bubbles
+    bubbles.forEach(b => {
+      b.x += b.vx; b.y += b.vy; b.phase += 0.008;
+      if (b.x < -b.r) b.x = W+b.r; if (b.x > W+b.r) b.x = -b.r;
+      if (b.y < -b.r) b.y = H+b.r; if (b.y > H+b.r) b.y = -b.r;
+      const pulse = 0.08 + Math.sin(b.phase) * 0.04;
+      const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      grad.addColorStop(0,   'rgba(' + b.color + ',' + pulse + ')');
+      grad.addColorStop(0.6, 'rgba(' + b.color + ',' + (pulse*0.3) + ')');
+      grad.addColorStop(1,   'rgba(' + b.color + ',0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
     });
 
-    // floating amber particles
-    particles.forEach(p => {
-      p.a += 0.006;
-      const alpha = (Math.sin(p.a) + 1) / 2 * 0.18;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
-      ctx.fill();
-      p.x += p.vx * 0.6; p.y += p.vy * 0.6;
-      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
-      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
-    });
+    // decorative circles — bold
+    ctx.strokeStyle = 'rgba(224,123,0,0.14)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(W*0.9, H*0.85, 110, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W*0.9, H*0.85, 65, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(29,111,191,0.10)';
+    ctx.beginPath(); ctx.arc(W*0.06, H*0.78, 80, 0, Math.PI*2); ctx.stroke();
   }
 
   function draw() {
+    t += 0.016;
     if (isDark()) drawDark(); else drawLight();
-    animId = requestAnimationFrame(draw);
+    requestAnimationFrame(draw);
   }
 
-  resize();
-  initParticles();
   draw();
-
-  window.addEventListener('resize', () => { resize(); initParticles(); });
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -238,13 +282,13 @@ function _renderTable() {
   filtered.forEach((trade, i) => {
     const tr       = document.createElement("tr");
     tr.dataset.id  = trade.id;
+    const isClosed = trade.status === "closed";
     if (isClosed) {
       const pl = trade.returns ?? 0;
       tr.classList.add(pl >= 0 ? "row-closed-profit" : "row-closed-loss");
     } else if (trade.livePrice) {
       tr.classList.add(trade.livePrice >= trade.buyPrice ? "row-open-up" : "row-open-down");
     }
-    const isClosed = trade.status === "closed";
 
     // Unrealized P/L for open trades
     let unrealPl  = null;

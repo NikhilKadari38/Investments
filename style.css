@@ -107,14 +107,12 @@ a { color: var(--accent); text-decoration: none; }
    ANIMATED BACKGROUND
 ───────────────────────────────────────────────────────────────────────────── */
 .bg-canvas {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
 }
-
-/* Dark — neon grid + floating particles */
-[data-theme="dark"] .bg-canvas { opacity: 1; }
-[data-theme="light"] .bg-canvas { opacity: 1; }
-
-.bg-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bg-canvas canvas {
+  position: fixed; top: 0; left: 0;
+  width: 100vw; height: 100vh;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    THEME TOGGLE
