@@ -17,6 +17,24 @@ let priceInterval   = null;
 // ─── DOM Helper ───────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 
+// ─── Theme ───────────────────────────────────────────────────────────────────
+const savedTheme = localStorage.getItem("nktt_theme") || "dark";
+document.documentElement.setAttribute("data-theme", savedTheme);
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = $("themeToggle");
+  if (btn) btn.textContent = savedTheme === "dark" ? "🌙" : "☀️";
+});
+
+document.addEventListener("click", (e) => {
+  if (e.target.id !== "themeToggle") return;
+  const html    = document.documentElement;
+  const current = html.getAttribute("data-theme");
+  const next    = current === "dark" ? "light" : "dark";
+  html.setAttribute("data-theme", next);
+  localStorage.setItem("nktt_theme", next);
+  e.target.textContent = next === "dark" ? "🌙" : "☀️";
+});
+
 // ─── Session Check ────────────────────────────────────────────────────────────
 if (sessionStorage.getItem("nktt_ok")) _showApp();
 
@@ -60,6 +78,114 @@ async function _showApp() {
   $("loginOverlay").classList.add("hidden");
   $("app").classList.remove("hidden");
   await _initApp();
+}
+
+
+// ─── Animated Background Canvas ──────────────────────────────────────────────
+function _initBgCanvas() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], animId;
+
+  function resize() {
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') !== 'light';
+  }
+
+  function initParticles() {
+    particles = Array.from({ length: 38 }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.4 + 0.4,
+      a: Math.random()
+    }));
+  }
+
+  function drawDark() {
+    ctx.clearRect(0, 0, W, H);
+
+    // subtle grid
+    ctx.strokeStyle = 'rgba(255,230,0,0.025)';
+    ctx.lineWidth = 1;
+    const gs = 72;
+    for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+    // corner brackets
+    const bl = 28, bw = 1.5;
+    ctx.strokeStyle = 'rgba(255,230,0,0.18)'; ctx.lineWidth = bw;
+    [[18,18],[W-18,18],[18,H-18],[W-18,H-18]].forEach(([cx,cy]) => {
+      const sx = cx === 18 ? 1 : -1;
+      const sy = cy === 18 ? 1 : -1;
+      ctx.beginPath(); ctx.moveTo(cx, cy + sy*bl); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx*bl, cy); ctx.stroke();
+    });
+
+    // floating neon particles
+    particles.forEach(p => {
+      p.a += 0.008;
+      const alpha = (Math.sin(p.a) + 1) / 2 * 0.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')';
+      ctx.fill();
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    });
+  }
+
+  function drawLight() {
+    ctx.clearRect(0, 0, W, H);
+
+    // dot grid
+    const gs = 60;
+    for (let x = gs; x < W; x += gs) {
+      for (let y = gs; y < H; y += gs) {
+        const alpha = 0.06 + (y / H) * 0.04;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
+        ctx.fill();
+      }
+    }
+
+    // faint decorative circles
+    [[W * 0.88, H * 0.85, 90],[W * 0.88, H * 0.85, 55],[0.06*W, H*0.75, 70]].forEach(([cx,cy,r], i) => {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = i < 2 ? 'rgba(224,123,0,0.07)' : 'rgba(29,111,191,0.06)';
+      ctx.lineWidth = 1; ctx.stroke();
+    });
+
+    // floating amber particles
+    particles.forEach(p => {
+      p.a += 0.006;
+      const alpha = (Math.sin(p.a) + 1) / 2 * 0.18;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(224,123,0,' + alpha + ')';
+      ctx.fill();
+      p.x += p.vx * 0.6; p.y += p.vy * 0.6;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+    });
+  }
+
+  function draw() {
+    if (isDark()) drawDark(); else drawLight();
+    animId = requestAnimationFrame(draw);
+  }
+
+  resize();
+  initParticles();
+  draw();
+
+  window.addEventListener('resize', () => { resize(); initParticles(); });
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -111,6 +237,12 @@ function _renderTable() {
   filtered.forEach((trade, i) => {
     const tr       = document.createElement("tr");
     tr.dataset.id  = trade.id;
+    if (isClosed) {
+      const pl = trade.returns ?? 0;
+      tr.classList.add(pl >= 0 ? "row-closed-profit" : "row-closed-loss");
+    } else if (trade.livePrice) {
+      tr.classList.add(trade.livePrice >= trade.buyPrice ? "row-open-up" : "row-open-down");
+    }
     const isClosed = trade.status === "closed";
 
     // Unrealized P/L for open trades

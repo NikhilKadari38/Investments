@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,7 +11,14 @@
   <!-- ── Login Overlay ──────────────────────────────────────────────────── -->
   <div id="loginOverlay" class="login-overlay">
     <div class="login-box">
-      <div class="login-logo">NK</div>
+      <div class="login-logo">
+        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="5" y1="29" x2="5" y2="3" stroke-width="1.5" stroke-linecap="round" class="axis"/>
+          <line x1="3" y1="29" x2="31" y2="29" stroke-width="1.5" stroke-linecap="round" class="axis"/>
+          <polyline points="5,23 11,15 18,19 28,7" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
+          <circle cx="28" cy="7" r="2.5" class="dot"/>
+        </svg>
+      </div>
       <h2>Trade Tracker</h2>
       <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
       <button id="loginBtn">Access</button>
@@ -21,12 +28,24 @@
 
   <!-- ── Main App ───────────────────────────────────────────────────────── -->
   <div id="app" class="app hidden">
+    <!-- Animated background -->
+    <div class="bg-canvas"><canvas id="bgCanvas"></canvas></div>
 
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <span class="logo-mark">NK</span>
-        <span class="logo-text">Trade Tracker</span>
+        <div class="logo-icon">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="3" y1="19" x2="3" y2="2" stroke-width="1.4" stroke-linecap="round" class="axis"/>
+            <line x1="2" y1="19" x2="20" y2="19" stroke-width="1.4" stroke-linecap="round" class="axis"/>
+            <polyline points="3,15 7,9 12,12 19,4" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
+            <circle cx="19" cy="4" r="1.8" class="dot"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-text">Trade Tracker</div>
+          <div class="logo-sub">NK's Investments</div>
+        </div>
       </div>
       <nav class="nav">
         <a href="#" class="nav-link active">Portfolio</a>
@@ -36,6 +55,7 @@
           <span class="status-dot" id="marketStatusDot"></span>
           <span id="marketStatusText">–</span>
         </div>
+        <button class="btn-theme" id="themeToggle" title="Toggle theme">🌙</button>
         <button class="btn-logout" id="logoutBtn">Logout</button>
       </div>
     </header>
