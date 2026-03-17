@@ -77,6 +77,7 @@ async function _handleLogin() {
 async function _showApp() {
   $("loginOverlay").classList.add("hidden");
   $("app").classList.remove("hidden");
+  _initBgCanvas();
   await _initApp();
 }
 
