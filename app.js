@@ -78,6 +78,7 @@ async function _showApp() {
   $("loginOverlay").classList.add("hidden");
   $("app").classList.remove("hidden");
   _initBgCanvas();
+  _initMobile();
   await _initApp();
 }
 
@@ -164,6 +165,28 @@ function _initBgCanvas() {
   }
 
   draw();
+}
+
+// ─── Mobile Init ─────────────────────────────────────────────────────────────
+function _initMobile() {
+  const fab = $("fabAdd");
+  if (!fab) return;
+
+  function checkMobile() {
+    if (window.innerWidth <= 768) {
+      fab.classList.remove("hidden");
+    } else {
+      fab.classList.add("hidden");
+    }
+  }
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
+
+  fab.addEventListener("click", () => {
+    $("addTradeModal").classList.remove("hidden");
+    $("inputBuyDate").valueAsDate = new Date();
+    $("inputSymbol").focus();
+  });
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -277,6 +300,73 @@ function _renderTable() {
   tbody.querySelectorAll(".btn-del").forEach((btn) =>
     btn.addEventListener("click", () => _confirmDelete(btn.dataset.id))
   );
+  _renderCards(filtered);
+}
+
+// ─── Mobile Card Render ───────────────────────────────────────────────────────
+function _renderCards(filtered) {
+  const container = $("tradeCards");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:40px 0;font-size:13px;">No trades yet — tap <strong style='color:var(--accent)'>+ Add Trade</strong> below</p>';
+    return;
+  }
+
+  filtered.forEach((trade) => {
+    const isClosed = trade.status === "closed";
+    const card     = document.createElement("div");
+    card.className = "trade-card";
+    card.dataset.id = trade.id;
+
+    // card color class
+    if (isClosed) {
+      card.classList.add((trade.returns ?? 0) >= 0 ? "card-closed-profit" : "card-closed-loss");
+    } else if (trade.livePrice) {
+      card.classList.add(trade.livePrice >= trade.buyPrice ? "card-open-up" : "card-open-down");
+    }
+
+    // P/L values
+    let plVal = null, plPct = null, currVal = null;
+    if (isClosed) {
+      plVal = trade.returns; plPct = trade.plPercent;
+    } else if (trade.livePrice) {
+      currVal = trade.livePrice * trade.shares;
+      plVal   = currVal - trade.investedAmount;
+      plPct   = (plVal / trade.investedAmount) * 100;
+    }
+    const plClass = plVal > 0 ? "profit" : plVal < 0 ? "loss" : "";
+
+    const sellBtn = isClosed
+      ? ""
+      : '<button class="tc-sell-btn" data-id="' + trade.id + '">Sell</button>';
+
+    card.innerHTML =
+      '<div class="tc-top">' +
+        '<div class="tc-symbol">' +
+          '<span class="sym-badge">' + trade.symbol + '</span>' +
+          (trade.exchange ? '<span class="exch-tag">' + trade.exchange + '</span>' : '') +
+          '<span class="status-badge ' + trade.status + '">' + (isClosed ? "Closed" : "Open") + '</span>' +
+        '</div>' +
+        '<div class="tc-actions">' +
+          '<button class="btn-del" data-id="' + trade.id + '">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tc-grid">' +
+        '<div class="tc-field"><span class="tc-label">Shares</span><span class="tc-val">' + trade.shares + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">Buy Price</span><span class="tc-val">' + _fmt(trade.buyPrice) + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">Invested</span><span class="tc-val">' + _fmt(trade.investedAmount) + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">Live Price</span><span class="tc-val live">' + (trade.livePrice ? _fmt(trade.livePrice) : "–") + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">Returns</span><span class="tc-val ' + plClass + '">' + (plVal !== null ? _fmt(plVal) : "–") + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">P/L %</span><span class="tc-val ' + plClass + '">' + (plPct !== null ? _fmtPct(plPct) : "–") + '</span></div>' +
+      '</div>' +
+      sellBtn;
+
+    card.querySelector(".btn-del")?.addEventListener("click", () => _confirmDelete(trade.id));
+    card.querySelector(".tc-sell-btn")?.addEventListener("click", () => _openSellModal(trade.id));
+    container.appendChild(card);
+  });
 }
 
 // ─── Add Trade Modal ──────────────────────────────────────────────────────────

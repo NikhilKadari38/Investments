@@ -477,3 +477,181 @@ a { color: var(--accent); text-decoration: none; }
 [data-theme="light"] .trade-table tr.row-closed-profit td:nth-child(2) { background: rgba(21,128,61,0.08); }
 [data-theme="light"] .trade-table tr.row-closed-loss td:nth-child(1),
 [data-theme="light"] .trade-table tr.row-closed-loss td:nth-child(2)   { background: rgba(185,28,28,0.07); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MOBILE RESPONSIVE — breakpoint 768px
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Tablet: hide right panel, shrink header ── */
+@media (max-width: 1024px) {
+  .section-right { width: 240px; }
+}
+
+@media (max-width: 768px) {
+
+  /* ── Header ── */
+  .header { padding: 0 14px; gap: 10px; height: 52px; }
+  .logo-sub { display: none; }
+  .logo-text { font-size: 13px; }
+  .nav { display: none; }
+  .market-status { display: none; }
+  .btn-logout { font-size: 10px; padding: 4px 10px; }
+
+  /* ── App shell — allow vertical scroll on mobile ── */
+  .app { height: auto; min-height: 100vh; overflow: visible; }
+  .main-content { flex-direction: column; overflow: visible; height: auto; }
+
+  /* ── Summary panel — horizontal scrolling cards strip ── */
+  .section-right {
+    width: 100%;
+    border-left: none;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 14px 10px;
+    gap: 10px;
+    overflow: visible;
+  }
+  .summary-title { font-size: 13px; margin-bottom: 2px; }
+  .summary-cards {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .summary-cards::-webkit-scrollbar { display: none; }
+  .summary-card {
+    min-width: 130px;
+    flex-shrink: 0;
+    padding: 10px 12px;
+  }
+  .summary-card.span-2 {
+    grid-column: unset;
+    min-width: 160px;
+  }
+  .summary-value { font-size: 12px; }
+  .summary-label { font-size: 7.5px; }
+  .top-performers { display: none; }
+
+  /* ── Left section ── */
+  .section-left {
+    border-right: none;
+    padding: 14px 12px 80px;
+    overflow: visible;
+    flex: none;
+  }
+  .section-header { flex-wrap: wrap; gap: 10px; }
+  .section-title { font-size: 16px; }
+  .btn-add { display: none; } /* replaced by FAB */
+
+  /* ── Table → hide, show card list instead ── */
+  .table-wrapper { display: none; }
+
+  /* ── Trade Cards (mobile only) ── */
+  .trade-cards { display: flex; flex-direction: column; gap: 10px; }
+  .trade-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 14px;
+    position: relative;
+  }
+  .trade-card.card-open-up    { border-left: 3px solid var(--profit); }
+  .trade-card.card-open-down  { border-left: 3px solid var(--loss); }
+  .trade-card.card-closed-profit { border-left: 3px solid var(--profit); background: var(--profit-bg); }
+  .trade-card.card-closed-loss   { border-left: 3px solid var(--loss);   background: var(--loss-bg); }
+
+  .tc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .tc-symbol { display: flex; align-items: center; gap: 8px; }
+  .tc-actions { display: flex; align-items: center; gap: 6px; }
+
+  .tc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+  }
+  .tc-field { display: flex; flex-direction: column; gap: 2px; }
+  .tc-label {
+    font-family: var(--ff-head);
+    font-size: 8px; font-weight: 600;
+    letter-spacing: .5px; text-transform: uppercase;
+    color: var(--text-2);
+  }
+  .tc-val {
+    font-family: var(--ff-mono);
+    font-size: 12px; color: var(--text-1);
+  }
+  .tc-val.profit { color: var(--profit); }
+  .tc-val.loss   { color: var(--loss); }
+  .tc-val.live   { color: var(--live); }
+
+  /* sell button full width on card */
+  .tc-sell-btn {
+    width: 100%; margin-top: 12px;
+    background: transparent; border: 1px solid var(--profit);
+    color: var(--profit); font-size: 11px;
+    font-family: var(--ff-head); font-weight: 700;
+    padding: 8px; border-radius: var(--r-sm);
+    cursor: pointer; transition: all var(--tx);
+    letter-spacing: .5px;
+  }
+  .tc-sell-btn:active { background: var(--profit); color: #000; }
+
+  /* ── Floating Add Trade button ── */
+  .fab-add {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent); color: var(--text-inv);
+    border: none; border-radius: 28px;
+    font-family: var(--ff-head); font-weight: 700;
+    font-size: 13px; letter-spacing: .5px;
+    padding: 13px 32px;
+    box-shadow: 0 4px 20px var(--accent-glow);
+    cursor: pointer; z-index: 400;
+    transition: opacity var(--tx), transform var(--tx);
+    white-space: nowrap;
+  }
+  .fab-add:active { opacity: .84; transform: translateX(-50%) scale(.97); }
+
+  /* ── Modals — full screen slide up ── */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal, .modal.modal-sm {
+    width: 100%;
+    border-radius: var(--r) var(--r) 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+    animation: slideUpMobile .22s ease;
+  }
+  @keyframes slideUpMobile {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .form-row { flex-direction: column; gap: 10px; }
+  .modal-body { padding: 16px; }
+  .modal-footer { padding: 14px 16px; }
+
+  /* ── Chatbot — full width ── */
+  .chatbot-widget { bottom: 80px; right: 14px; }
+  .chatbot-panel {
+    width: calc(100vw - 28px);
+    height: 420px;
+    border-radius: var(--r);
+  }
+
+  /* ── Toast ── */
+  .toast-wrap { bottom: 90px; right: 14px; left: 14px; }
+  .toast { white-space: normal; text-align: center; }
+
+  /* ── Filter tabs ── */
+  .filter-tab { font-size: 10px; padding: 4px 10px; }
+
+  /* ── Login ── */
+  .login-box { width: calc(100vw - 40px); padding: 32px 24px; }
+}
+
+/* ── Desktop: hide card view, show table ── */
+@media (min-width: 769px) {
+  .trade-cards { display: none; }
+  .fab-add     { display: none; }
+}
