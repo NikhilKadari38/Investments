@@ -1,17 +1,8 @@
 // ─── NK Trade Tracker — Live Price Fetcher ───────────────────────────────────
-// Uses personal Cloudflare Worker to fetch Yahoo Finance prices
-// Worker URL: https://nk-price-proxy.lotuswhite9392.workers.dev
+// Uses personal Cloudflare Worker → no CORS issues, no rate limits
 
 const WORKER_URL = "https://nk-price-proxy.lotuswhite9392.workers.dev";
 
-/**
- * Fetch the live market price for a stock symbol.
- * Tries NSE first, then BSE as fallback.
- *
- * @param {string}      symbol           — e.g. "RELIANCE", "TATAMOTORS"
- * @param {string|null} preferredExchange — "NS" | "BO" | null (auto-detect)
- * @returns {Promise<{ price: number|null, exchange: string|null }>}
- */
 export async function fetchLivePrice(symbol, preferredExchange = null) {
   const primary   = preferredExchange ?? "NS";
   const secondary = primary === "NS" ? "BO" : "NS";
@@ -30,7 +21,6 @@ async function _fetchPrice(symbol, suffix) {
     const url    = WORKER_URL + "?symbol=" + encodeURIComponent(ticker);
     const res    = await fetch(url);
     if (!res.ok) return null;
-
     const data  = await res.json();
     const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
     return (price && price > 0) ? parseFloat(price.toFixed(2)) : null;
