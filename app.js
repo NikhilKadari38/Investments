@@ -93,119 +93,76 @@ function _initBgCanvas() {
     canvas.height = window.innerHeight;
   }
   resize();
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', () => { resize(); });
 
   function isDark() {
     return document.documentElement.getAttribute('data-theme') !== 'light';
   }
 
-  // ── DARK: scrolling matrix rain of financial symbols ──────────────────────
-  const SYMBOLS = ['₹','%','+','-','▲','▼','0','1','2','3','4','5','6','7','8','9'];
-  const COLS_DARK = [];
-  function initDark() {
-    COLS_DARK.length = 0;
-    const cols = Math.floor(canvas.width / 22);
-    for (let i = 0; i < cols; i++) {
-      COLS_DARK.push({
-        x: i * 22 + 11,
-        y: Math.random() * -canvas.height,
-        speed: 0.4 + Math.random() * 0.8,
-        chars: Array.from({length: 18}, () => ({
-          c: SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
-          opacity: Math.random()
-        })),
-        headOpacity: 0.9 + Math.random() * 0.1,
-        swapTimer: 0
-      });
-    }
+  // shared: slow floating dots
+  let dots = [];
+  function initDots() {
+    dots = Array.from({ length: 55 }, () => ({
+      x:     Math.random() * canvas.width,
+      y:     Math.random() * canvas.height,
+      r:     1.5 + Math.random() * 3,
+      vx:    (Math.random() - 0.5) * 0.35,
+      vy:    (Math.random() - 0.5) * 0.35,
+      phase: Math.random() * Math.PI * 2,
+    }));
   }
-  initDark();
-  window.addEventListener('resize', initDark);
-
-  // ── LIGHT: flowing sine wave lines ────────────────────────────────────────
-  const WAVES = Array.from({length: 6}, (_, i) => ({
-    amp:    40 + i * 18,
-    freq:   0.006 + i * 0.002,
-    speed:  0.008 + i * 0.003,
-    phase:  (i / 6) * Math.PI * 2,
-    yBase:  0,
-    color:  i % 2 === 0 ? '224,123,0' : '29,111,191',
-    width:  1.2 + i * 0.3
-  }));
+  initDots();
+  window.addEventListener('resize', initDots);
 
   let t = 0;
 
-  function drawDark() {
-    const W = canvas.width, H = canvas.height;
-    // fade trail
-    ctx.fillStyle = 'rgba(0,0,0,0.06)';
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.font = '13px "IBM Plex Mono", monospace';
-    ctx.textAlign = 'center';
-
-    COLS_DARK.forEach(col => {
-      col.y += col.speed;
-      col.swapTimer++;
-      if (col.swapTimer > 8) {
-        col.swapTimer = 0;
-        const ri = Math.floor(Math.random() * col.chars.length);
-        col.chars[ri].c = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-      }
-      if (col.y > H + 200) {
-        col.y = -col.chars.length * 18;
-        col.speed = 0.4 + Math.random() * 0.8;
-      }
-
-      col.chars.forEach((ch, j) => {
-        const cy = col.y + j * 18;
-        if (cy < -18 || cy > H + 18) return;
-
-        const isHead = j === col.chars.length - 1;
-        if (isHead) {
-          ctx.fillStyle = 'rgba(255,255,220,' + col.headOpacity + ')';
-        } else {
-          const fade = (j / col.chars.length);
-          const alpha = fade * 0.55;
-          ctx.fillStyle = 'rgba(255,230,0,' + alpha + ')';
-        }
-        ctx.fillText(ch.c, col.x, cy);
-      });
-    });
-  }
-
-  function drawLight() {
+  function draw() {
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
+    t += 0.012;
 
-    // evenly spread waves across full height
-    const gap = H / (WAVES.length + 1);
+    const dark = isDark();
+    const dotColor  = dark ? '255,230,0'  : '224,123,0';
+    const lineColor = dark ? '255,230,0'  : '224,123,0';
 
-    WAVES.forEach((wave, i) => {
-      wave.phase += wave.speed;
-      const yBase = gap * (i + 1);
+    // update + draw dots
+    dots.forEach((d, i) => {
+      d.x += d.vx; d.y += d.vy; d.phase += 0.018;
+      if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+      if (d.y < 0) d.y = H; if (d.y > H) d.y = 0;
 
+      const alpha = dark
+        ? 0.15 + Math.sin(d.phase) * 0.10
+        : 0.20 + Math.sin(d.phase) * 0.12;
       ctx.beginPath();
-      for (let x = 0; x <= W; x += 3) {
-        const y = yBase + Math.sin(x * wave.freq + wave.phase) * wave.amp;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      const alpha = 0.10 + Math.sin(t * 0.4 + i) * 0.04;
-      ctx.strokeStyle = 'rgba(' + wave.color + ',' + alpha + ')';
-      ctx.lineWidth = wave.width;
-      ctx.stroke();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + dotColor + ',' + alpha + ')';
+      ctx.fill();
     });
 
-    t += 0.016;
-  }
+    // draw connecting lines between nearby dots
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const dx = dots[i].x - dots[j].x;
+        const dy = dots[i].y - dots[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          const alpha = dark
+            ? (1 - dist / 120) * 0.12
+            : (1 - dist / 120) * 0.14;
+          ctx.beginPath();
+          ctx.moveTo(dots[i].x, dots[i].y);
+          ctx.lineTo(dots[j].x, dots[j].y);
+          ctx.strokeStyle = 'rgba(' + lineColor + ',' + alpha + ')';
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
 
-  // clear canvas once before starting
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  function draw() {
-    if (isDark()) drawDark(); else drawLight();
     requestAnimationFrame(draw);
   }
+
   draw();
 }
 
