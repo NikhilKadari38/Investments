@@ -364,7 +364,8 @@ a { color: var(--accent); text-decoration: none; }
    RIGHT — SUMMARY
 ───────────────────────────────────────────────────────────────────────────── */
 .section-right { width: var(--right-w); flex-shrink: 0; padding: 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
-.summary-title { font-family: var(--ff-head); font-size: 14px; font-weight: 700; color: var(--text-1); letter-spacing: -.3px; }
+.summary-title { font-family: var(--ff-head); font-size: 14px; font-weight: 700; color: var(--text-1); letter-spacing: -.3px; display: flex; align-items: center; gap: 8px; }
+.trade-count-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent, #6c63ff); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0; }
 .summary-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .summary-card {
   background: var(--surface); border: 1px solid var(--border);

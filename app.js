@@ -599,7 +599,25 @@ function _updateSummary() {
   rEl.textContent   = _fmt(realized);
   rEl.className     = "summary-value " + (realized >= 0 ? "profit" : "loss");
 
-  $("sumTotalTrades").textContent = trades.length;
+  $("sumTradesBadge").textContent = trades.length;
+
+  const openWithDay = open.filter((t) => t.livePrice && t.dayChangePct != null);
+  const dayPnl = openWithDay.reduce((s, t) => {
+    const prevClose = t.livePrice / (1 + t.dayChangePct / 100);
+    return s + (t.livePrice - prevClose) * t.shares;
+  }, 0);
+  const dayBase = openWithDay.reduce((s, t) => {
+    const prevClose = t.livePrice / (1 + t.dayChangePct / 100);
+    return s + prevClose * t.shares;
+  }, 0);
+  const dayPnlPct = dayBase > 0 ? (dayPnl / dayBase) * 100 : 0;
+
+  const dEl = $("sumDayPnl");
+  dEl.textContent = _fmt(dayPnl);
+  dEl.className   = "summary-value " + (dayPnl >= 0 ? "profit" : "loss");
+  const dPEl = $("sumDayPnlPct");
+  dPEl.textContent = _fmtPct(dayPnlPct);
+  dPEl.className   = "summary-sub " + (dayPnl >= 0 ? "profit" : "loss");
 
 
   _renderMovers();
