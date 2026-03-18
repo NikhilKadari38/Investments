@@ -53,7 +53,7 @@ async function _handleLogin() {
       if (data.user === "nikhil" && data.password === pw) ok = true;
     });
     if (ok) {
-      sessionStorage.setItem("nktt_ok", "1");
+      localStorage.setItem("nktt_ok", "1");
       _showApp();
     } else {
       err.textContent  = "Incorrect password.";
@@ -731,11 +731,11 @@ function _toast(msg, type = "info") {
 $("loginBtn").addEventListener("click", _handleLogin);
 $("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
 $("logoutBtn").addEventListener("click", () => {
-  sessionStorage.removeItem("nktt_ok");
+  localStorage.removeItem("nktt_ok");
   clearInterval(priceInterval);
   location.reload();
 });
-if (sessionStorage.getItem("nktt_ok")) _showApp();
+if (localStorage.getItem("nktt_ok")) _showApp();
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function _fmt(val) {
