@@ -6,6 +6,7 @@ import {
   query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { fetchLivePrice } from "./prices.js";
+import { initChatbot }    from "./chatbot.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
@@ -53,7 +54,7 @@ async function _handleLogin() {
       if (data.user === "nikhil" && data.password === pw) ok = true;
     });
     if (ok) {
-      localStorage.setItem("nktt_ok", "1");
+      sessionStorage.setItem("nktt_ok", "1");
       _showApp();
     } else {
       err.textContent  = "Incorrect password.";
@@ -190,7 +191,10 @@ async function _initApp() {
   await _loadTrades();
   _renderTable();
   _updateSummary();
+  initChatbot(_getPortfolioContext);
   _startPriceRefresh();
+  _initTicker();
+  _initGraphToggle();
 }
 
 // ─── Load Trades ──────────────────────────────────────────────────────────────
@@ -572,7 +576,7 @@ async function _confirmDelete(tradeId) {
   }
 }
 
-// ─── Summary Panel ────────────────────────────────────────────────────────────
+// ─── Summary Panel ───────────────────────────────────────────────────────────
 function _updateSummary() {
   const open   = trades.filter((t) => t.status === "open");
   const closed = trades.filter((t) => t.status === "closed");
@@ -583,65 +587,240 @@ function _updateSummary() {
   const unrealized     = currentValue - activeInvested;
   const unrealPct      = activeInvested > 0 ? (unrealized / activeInvested) * 100 : 0;
   const realized       = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
-  const wins           = closed.filter((t) => (t.returns ?? 0) > 0).length;
 
-  $("sumActiveInvested").textContent = _fmt(activeInvested);
-  $("sumCurrentValue").textContent   = _fmt(currentValue);
+  // Circles
+  const invEl = $("sumActiveInvested");
+  const curEl = $("sumCurrentValue");
+  if (invEl) { invEl.textContent = _fmtL(activeInvested); invEl.className = "sum-circ-val yellow"; }
+  if (curEl) {
+    curEl.textContent = _fmtL(currentValue);
+    curEl.className   = "sum-circ-val " + (unrealized >= 0 ? "profit" : "loss");
+    const glow = $("sumCurrentValue")?.closest(".sum-circle");
+    if (glow) glow.className = "sum-circle " + (unrealized >= 0 ? "sum-circle-glow" : "sum-circle-loss");
+  }
 
-  const uEl  = $("sumUnrealized");
-  const uPEl = $("sumUnrealizedPct");
-  uEl.textContent   = _fmt(unrealized);
-  uEl.className     = "summary-value " + (unrealized >= 0 ? "profit" : "loss");
-  uPEl.textContent  = _fmtPct(unrealPct);
-  uPEl.className    = "summary-sub " + (unrealized >= 0 ? "profit" : "loss");
+  // P/L oval
+  const plOval = document.querySelector(".sum-pl-oval");
+  const plVal  = $("sumUnrealized");
+  const plPct  = $("sumUnrealizedPct");
+  if (plVal)  plVal.textContent  = _fmt(unrealized);
+  if (plPct)  plPct.textContent  = _fmtPct(unrealPct);
+  if (plOval) plOval.className   = "sum-pl-oval " + (unrealized >= 0 ? "is-profit" : "is-loss");
 
+  // Realized pill
   const rEl = $("sumRealized");
-  rEl.textContent   = _fmt(realized);
-  rEl.className     = "summary-value " + (realized >= 0 ? "profit" : "loss");
+  if (rEl) { rEl.textContent = _fmt(realized); rEl.className = "sum-r-val " + (realized >= 0 ? "profit" : "loss"); }
 
-  $("sumTradesBadge").textContent = trades.length;
+  // Update ticker
+  _updateTicker();
 
-  const openWithDay = open.filter((t) => t.livePrice && t.dayChangePct != null);
-  const dayPnl = openWithDay.reduce((s, t) => {
-    const prevClose = t.livePrice / (1 + t.dayChangePct / 100);
-    return s + (t.livePrice - prevClose) * t.shares;
-  }, 0);
-  const dayBase = openWithDay.reduce((s, t) => {
-    const prevClose = t.livePrice / (1 + t.dayChangePct / 100);
-    return s + prevClose * t.shares;
-  }, 0);
-  const dayPnlPct = dayBase > 0 ? (dayPnl / dayBase) * 100 : 0;
-
-  const dEl = $("sumDayPnl");
-  dEl.textContent = _fmt(dayPnl);
-  dEl.className   = "summary-value " + (dayPnl >= 0 ? "profit" : "loss");
-  const dPEl = $("sumDayPnlPct");
-  dPEl.textContent = _fmtPct(dayPnlPct);
-  dPEl.className   = "summary-sub " + (dayPnl >= 0 ? "profit" : "loss");
-
-
-  _renderMovers();
+  // Re-render graph with current data
+  _renderCurrentGraph();
 }
 
-function _renderMovers() {
-  const el   = $("topMovers");
-  const open = trades.filter((t) => t.status === "open" && t.livePrice);
-  if (!el) return;
-  if (open.length === 0) {
-    el.innerHTML = '<span class="muted-txt">No live prices yet</span>';
+// ─── Graph Toggle ─────────────────────────────────────────────────────────────
+let _activeGraph = "overview";
+
+function _initGraphToggle() {
+  document.querySelectorAll(".sum-tgl-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".sum-tgl-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      _activeGraph = btn.dataset.graph;
+      $("sumGraphTitle").textContent = _activeGraph === "overview" ? "Overview" : "Trade Breakdown";
+      _renderCurrentGraph();
+    });
+  });
+}
+
+function _renderCurrentGraph() {
+  if (_activeGraph === "overview") _renderOverviewGraph();
+  else _renderTradesGraph();
+}
+
+function _renderOverviewGraph() {
+  const container = $("sumGraph");
+  if (!container) return;
+  const DEPOSITED = 350000;
+  const open      = trades.filter((t) => t.status === "open");
+  const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
+  const current   = open.reduce((s, t) =>
+    s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+
+  const max  = Math.max(DEPOSITED, invested, current, 1);
+  const maxH = 90;
+
+  const bars = [
+    { label: "Deposited", val: DEPOSITED, cls: "dep" },
+    { label: "Invested",  val: invested,  cls: "inv" },
+    { label: "Current",   val: current,   cls: "cur" },
+  ];
+
+  container.innerHTML = bars.map((b) => {
+    const h   = Math.max(14, Math.round((b.val / max) * maxH));
+    const lbl = "₹" + (b.val / 100000).toFixed(1) + "L";
+    return '<div class="pop-col">' +
+      '<div class="pop-top-val">' + lbl + '</div>' +
+      '<div class="pop-stick-wrap">' +
+        '<div class="pop-stick ' + b.cls + '" style="height:' + h + 'px;"></div>' +
+      '</div>' +
+      '<div class="pop-lbl">' + b.label + '</div>' +
+    '</div>';
+  }).join("");
+}
+
+function _renderTradesGraph() {
+  const container = $("sumGraph");
+  if (!container) return;
+  const open = trades.filter((t) => t.status === "open");
+  if (!open.length) {
+    container.innerHTML = '<span style="color:var(--text-3);font-size:12px;text-align:center;width:100%;padding-top:30px;">No open trades</span>';
     return;
   }
-  const sorted = [...open]
-    .sort((a, b) => (b.livePrice - b.buyPrice) / b.buyPrice - (a.livePrice - a.buyPrice) / a.buyPrice)
+
+  const maxInv  = Math.max(...open.map((t) => t.investedAmount), 1);
+  const maxPl   = Math.max(...open.map((t) => {
+    const curr = t.livePrice ? t.livePrice * t.shares : t.investedAmount;
+    return Math.abs(curr - t.investedAmount);
+  }), 1);
+  const maxH    = 90;
+  const maxOvH  = 40;
+
+  container.innerHTML = open.map((t) => {
+    const baseH   = Math.max(14, Math.round((t.investedAmount / maxInv) * maxH));
+    const curr    = t.livePrice ? t.livePrice * t.shares : t.investedAmount;
+    const pl      = curr - t.investedAmount;
+    const ovH     = pl !== 0
+      ? Math.max(10, Math.round((Math.abs(pl) / maxPl) * maxOvH))
+      : 0;
+    const ovClass = pl >= 0 ? "profit" : "loss";
+    const plStr   = pl >= 0
+      ? "+" + (pl >= 1000 ? Math.round(pl / 1000) + "K" : Math.round(pl))
+      : "-" + (Math.abs(pl) >= 1000 ? Math.round(Math.abs(pl) / 1000) + "K" : Math.round(Math.abs(pl)));
+    const sym     = t.symbol.length > 6 ? t.symbol.slice(0, 6) + ".." : t.symbol;
+
+    return '<div class="pop-col">' +
+      '<div class="pop-stick-wrap">' +
+        '<div class="pop-trade-base" style="height:' + baseH + 'px;">' +
+          (ovH > 0
+            ? '<div class="pop-trade-overlay ' + ovClass + '" style="height:' + ovH + 'px;">' +
+                '<span class="pop-ov-val">' + plStr + '</span>' +
+              '</div>'
+            : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="pop-lbl">' + sym + '</div>' +
+    '</div>';
+  }).join("");
+}
+
+// ─── Ticker Tape ─────────────────────────────────────────────────────────────
+let _tickerInterval = null;
+let _tickerIsA      = true;
+
+function _initTicker() {
+  clearInterval(_tickerInterval);
+  _updateTicker();
+  _tickerInterval = setInterval(_rotateTicker, 4000);
+}
+
+function _updateTicker() {
+  const open = trades.filter((t) => t.status === "open");
+
+  // Group 1 — top 4 biggest day movers (by absolute dayChangePct)
+  const movers = [...open]
+    .filter((t) => t.dayChangePct !== null && t.dayChangePct !== undefined)
+    .sort((a, b) => Math.abs(b.dayChangePct) - Math.abs(a.dayChangePct))
     .slice(0, 4);
 
-  el.innerHTML = sorted.map((t) => {
-    const pct = ((t.livePrice - t.buyPrice) / t.buyPrice) * 100;
-    return '<div class="mover-row">' +
-      '<span class="sym-badge sm">' + t.symbol + '</span>' +
-      '<span class="' + (pct >= 0 ? "profit" : "loss") + '">' + _fmtPct(pct) + '</span>' +
-      '</div>';
+  // Group 2 — top 4 portfolio gainers (by unrealized P/L %)
+  const gainers = [...open]
+    .filter((t) => t.livePrice)
+    .map((t) => {
+      const pl = (t.livePrice * t.shares - t.investedAmount) / t.investedAmount * 100;
+      return { ...t, portfolioPct: parseFloat(pl.toFixed(2)) };
+    })
+    .sort((a, b) => b.portfolioPct - a.portfolioPct)
+    .slice(0, 4);
+
+  window._tickerGroups = [
+    { label: "Day Movers",   data: movers,  key: "dayChangePct" },
+    { label: "Top Gainers",  data: gainers, key: "portfolioPct" },
+  ];
+
+  // Render initial group A
+  _fillTickerRow("tickerA", window._tickerGroups[0]);
+  if (!$("tickerB").innerHTML) _fillTickerRow("tickerB", window._tickerGroups[1]);
+}
+
+function _fillTickerRow(id, group) {
+  const el = $(id);
+  if (!el) return;
+  if (!group.data.length) {
+    el.innerHTML = '<span style="color:var(--text-3);font-family:var(--ff-mono);font-size:11px;">–</span>';
+    return;
+  }
+  el.innerHTML = group.data.map((t) => {
+    const pct    = group.key === "dayChangePct" ? t.dayChangePct : t.portfolioPct;
+    const isUp   = pct >= 0;
+    const cls    = isUp ? "up" : "down";
+    const arrow  = isUp ? "▲" : "▼";
+    const sign   = isUp ? "+" : "";
+    return '<div class="tick-chip ' + cls + '">' +
+      '<span class="tick-sym">' + t.symbol + '</span>' +
+      '<span class="tick-pct ' + cls + '">' + arrow + ' ' + sign + parseFloat(pct).toFixed(2) + '%</span>' +
+    '</div>';
   }).join("");
+}
+
+function _rotateTicker() {
+  const groups = window._tickerGroups || [];
+  if (!groups.length) return;
+
+  const a = $("tickerA"), b = $("tickerB"), lbl = $("tickerLabel");
+  if (!a || !b) return;
+
+  const nextIdx    = _tickerIsA ? 1 : 0;
+  const entering   = _tickerIsA ? b : a;
+  const leaving    = _tickerIsA ? a : b;
+
+  _fillTickerRow(entering.id, groups[nextIdx]);
+  entering.style.transition = "none";
+  entering.style.transform  = "translateY(100%)";
+  entering.style.opacity    = "0";
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    leaving.style.transition  = "transform 0.45s ease, opacity 0.45s ease";
+    leaving.style.transform   = "translateY(-100%)";
+    leaving.style.opacity     = "0";
+    entering.style.transition = "transform 0.45s ease, opacity 0.45s ease";
+    entering.style.transform  = "translateY(0)";
+    entering.style.opacity    = "1";
+    if (lbl) lbl.textContent  = groups[nextIdx].label;
+    _tickerIsA = !_tickerIsA;
+  }));
+}
+
+// ─── Portfolio Context for Chatbot ────────────────────────────────────────────
+function _getPortfolioContext() {
+  const open   = trades.filter((t) => t.status === "open");
+  const closed = trades.filter((t) => t.status === "closed");
+  const totalInvested = open.reduce((s, t) => s + t.investedAmount, 0);
+  const realized      = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
+  const wins          = closed.filter((t) => (t.returns ?? 0) > 0).length;
+
+  const openStr = open.map((t) =>
+    t.symbol + "(" + t.shares + "sh @ ₹" + t.buyPrice +
+    (t.livePrice ? ", live ₹" + t.livePrice : "") + ")"
+  ).join(", ");
+
+  return [
+    "Portfolio: " + open.length + " open, " + closed.length + " closed trades.",
+    "Active invested: ₹" + totalInvested.toLocaleString("en-IN"),
+    "Realized returns: ₹" + realized.toLocaleString("en-IN"),
+    closed.length > 0 ? "Win rate: " + Math.round(wins / closed.length * 100) + "%" : "",
+    open.length > 0 ? "Open positions: " + openStr : "No open positions."
+  ].filter(Boolean).join("\n");
 }
 
 // ─── Live Prices ──────────────────────────────────────────────────────────────
@@ -731,13 +910,18 @@ function _toast(msg, type = "info") {
 $("loginBtn").addEventListener("click", _handleLogin);
 $("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
 $("logoutBtn").addEventListener("click", () => {
-  localStorage.removeItem("nktt_ok");
+  sessionStorage.removeItem("nktt_ok");
   clearInterval(priceInterval);
   location.reload();
 });
-if (localStorage.getItem("nktt_ok")) _showApp();
+if (sessionStorage.getItem("nktt_ok")) _showApp();
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
+function _fmtL(val) {
+  if (!val && val !== 0) return "–";
+  return "₹" + (val / 100000).toFixed(2) + "L";
+}
+
 function _fmt(val) {
   if (val === null || val === undefined || isNaN(val)) return "–";
   return "₹" + parseFloat(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

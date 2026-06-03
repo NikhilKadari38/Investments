@@ -17,7 +17,14 @@
   <!-- ── Login Overlay ──────────────────────────────────────────────────── -->
   <div id="loginOverlay" class="login-overlay">
     <div class="login-box">
-      <div class="login-logo">NK</div>
+      <div class="login-logo">
+        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="5" y1="29" x2="5" y2="3" stroke-width="1.5" stroke-linecap="round" class="axis"/>
+          <line x1="3" y1="29" x2="31" y2="29" stroke-width="1.5" stroke-linecap="round" class="axis"/>
+          <polyline points="5,23 11,15 18,19 28,7" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
+          <circle cx="28" cy="7" r="2.5" class="dot"/>
+        </svg>
+      </div>
       <h2>Trade Tracker</h2>
       <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
       <button id="loginBtn">Access</button>
@@ -33,7 +40,14 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <div class="logo-icon">NK</div>
+        <div class="logo-icon">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="3" y1="19" x2="3" y2="2" stroke-width="1.4" stroke-linecap="round" class="axis"/>
+            <line x1="2" y1="19" x2="20" y2="19" stroke-width="1.4" stroke-linecap="round" class="axis"/>
+            <polyline points="3,15 7,9 12,12 19,4" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
+            <circle cx="19" cy="4" r="1.8" class="dot"/>
+          </svg>
+        </div>
         <div>
           <div class="logo-text">Trade Tracker</div>
           <div class="logo-sub">NK's Investments</div>
@@ -64,6 +78,13 @@
               <button class="filter-tab active" data-filter="all">All</button>
               <button class="filter-tab" data-filter="open">Open</button>
               <button class="filter-tab" data-filter="closed">Closed</button>
+            </div>
+          </div>
+          <div class="ticker-tape">
+            <span class="ticker-label" id="tickerLabel">Day Movers</span>
+            <div class="ticker-viewport">
+              <div class="ticker-row" id="tickerA"></div>
+              <div class="ticker-row" id="tickerB"></div>
             </div>
           </div>
           <button class="btn-add" id="addTradeBtn">+ Add Trade</button>
@@ -104,40 +125,57 @@
 
       <!-- ── Right: Summary Panel ────────────────────────────────────── -->
       <aside class="section-right">
-        <h2 class="summary-title">Summary <span class="trade-count-badge" id="sumTradesBadge">0</span></h2>
+        <h2 class="sum-head">Summary</h2>
 
-        <div class="summary-cards">
-          <div class="summary-card">
-            <span class="summary-label">Active Invested</span>
-            <span class="summary-value" id="sumActiveInvested">₹0.00</span>
+        <!-- Deposited Capital -->
+        <div class="sum-dep-pill">
+          <div>
+            <div class="sum-dep-label">Deposited Capital</div>
+            <div class="sum-dep-val">₹3,50,000</div>
           </div>
-          <div class="summary-card">
-            <span class="summary-label">Current Value</span>
-            <span class="summary-value" id="sumCurrentValue">₹0.00</span>
-          </div>
-          <div class="summary-card span-2">
-            <span class="summary-label">Unrealized P/L</span>
-            <span class="summary-value" id="sumUnrealized">₹0.00</span>
-            <span class="summary-sub" id="sumUnrealizedPct">+0.00%</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">Realized Returns</span>
-            <span class="summary-value" id="sumRealized">₹0.00</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">Day's P&amp;L</span>
-            <span class="summary-value" id="sumDayPnl">₹0.00</span>
-            <span class="summary-sub" id="sumDayPnlPct">+0.00%</span>
-          </div>
-
+          <div class="sum-dep-coin">₹</div>
         </div>
 
-        <div class="top-performers">
-          <p class="performers-title">Top Movers</p>
-          <div id="topMovers" class="movers-list">
-            <span class="muted-txt">–</span>
+        <!-- Circles -->
+        <div class="sum-circles">
+          <div class="sum-circle">
+            <span class="sum-circ-label">Active<br>Invested</span>
+            <span class="sum-circ-val yellow" id="sumActiveInvested">₹0</span>
+          </div>
+          <div class="sum-circle sum-circle-glow">
+            <span class="sum-circ-label">Current<br>Value</span>
+            <span class="sum-circ-val" id="sumCurrentValue">₹0</span>
           </div>
         </div>
+
+        <!-- Unrealized P/L oval -->
+        <div class="sum-pl-oval">
+          <div>
+            <div class="sum-pl-label">Unrealized P/L</div>
+            <div class="sum-pl-val" id="sumUnrealized">₹0.00</div>
+          </div>
+          <span class="sum-pl-pct" id="sumUnrealizedPct">0%</span>
+        </div>
+
+        <!-- Realized pill -->
+        <div class="sum-realized-pill">
+          <span class="sum-r-label">Realized Returns</span>
+          <span class="sum-r-val" id="sumRealized">₹0.00</span>
+        </div>
+
+        <!-- Graph -->
+        <div class="sum-graph-sep"></div>
+        <div class="sum-graph-section">
+          <div class="sum-graph-header">
+            <span class="sum-graph-title" id="sumGraphTitle">Overview</span>
+            <div class="sum-graph-toggle">
+              <button class="sum-tgl-btn active" data-graph="overview">Overview</button>
+              <button class="sum-tgl-btn" data-graph="trades">Trades</button>
+            </div>
+          </div>
+          <div id="sumGraph" class="sum-graph-area"></div>
+        </div>
+
       </aside>
 
     </main>
@@ -233,6 +271,24 @@
 
   <!-- ── Mobile FAB ──────────────────────────────────────────────────────── -->
   <button class="fab-add hidden" id="fabAdd">+ Add Trade</button>
+
+  <!-- ── Chatbot Widget ─────────────────────────────────────────────────── -->
+  <div id="chatbotWidget" class="chatbot-widget">
+    <div id="chatbotPanel" class="chatbot-panel hidden">
+      <div class="chatbot-header">
+        <span>AI Assistant</span>
+        <button id="closeChatbot">✕</button>
+      </div>
+      <div class="chatbot-messages" id="chatMessages"></div>
+      <div class="chatbot-input-row">
+        <input type="text" id="chatInput" placeholder="Ask about your portfolio..." />
+        <button id="chatSend">↑</button>
+      </div>
+    </div>
+    <button id="chatbotToggle" class="chatbot-toggle" title="AI Assistant">
+      <span class="chatbot-icon">✦</span>
+    </button>
+  </div>
 
   <!-- ── Scripts (app.js imports everything else) ──────────────────────── -->
   <script type="module" src="app.js"></script>
