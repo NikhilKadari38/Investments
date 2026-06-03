@@ -193,8 +193,8 @@ async function _initApp() {
   _updateSummary();
   initChatbot(_getPortfolioContext);
   _startPriceRefresh();
-  _initTicker();
-  _initGraphToggle();
+  try { _initTicker(); }      catch(e) { console.error("Ticker init error:", e); }
+  try { _initGraphToggle(); } catch(e) { console.error("Graph init error:", e); }
 }
 
 // ─── Load Trades ──────────────────────────────────────────────────────────────
@@ -906,15 +906,26 @@ function _toast(msg, type = "info") {
 }
 
 // ─── Startup ─────────────────────────────────────────────────────────────────
-// Run after all functions are defined
-$("loginBtn").addEventListener("click", _handleLogin);
-$("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
-$("logoutBtn").addEventListener("click", () => {
-  sessionStorage.removeItem("nktt_ok");
-  clearInterval(priceInterval);
-  location.reload();
-});
-if (sessionStorage.getItem("nktt_ok")) _showApp();
+// Always attach login listeners first — isolated so nothing can break them
+(function attachLoginListeners() {
+  try {
+    const loginBtn = document.getElementById("loginBtn");
+    const loginPw  = document.getElementById("loginPassword");
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (loginBtn)  loginBtn.addEventListener("click", _handleLogin);
+    if (loginPw)   loginPw.addEventListener("keydown", (e) => { if (e.key === "Enter") _handleLogin(); });
+    if (logoutBtn) logoutBtn.addEventListener("click", () => {
+      sessionStorage.removeItem("nktt_ok");
+      clearInterval(priceInterval);
+      location.reload();
+    });
+  } catch(e) { console.error("Login listener error:", e); }
+})();
+
+// Auto-login if session exists
+try {
+  if (sessionStorage.getItem("nktt_ok")) _showApp();
+} catch(e) { console.error("Session check error:", e); }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function _fmtL(val) {
