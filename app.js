@@ -6,7 +6,6 @@ import {
   query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { fetchLivePrice } from "./prices.js";
-import { initChatbot }    from "./chatbot.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
@@ -191,7 +190,6 @@ async function _initApp() {
   await _loadTrades();
   _renderTable();
   _updateSummary();
-  initChatbot(_getPortfolioContext);
   _startPriceRefresh();
   try { _initTicker(); }      catch(e) { console.error("Ticker init error:", e); }
   try { _initGraphToggle(); } catch(e) { console.error("Graph init error:", e); }
