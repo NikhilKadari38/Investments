@@ -855,14 +855,49 @@ async function _refreshAllPrices() {
   await Promise.all(open.map((t) => _fetchAndSavePrice(t.id, t.symbol, t.exchange)));
 }
 
+// ─── Refresh Closed Trade Prices (display only) ───────────────────────────────
+// Fetches current price for closed trades purely for visual context.
+// In-memory only — no Firestore write, no summary/ticker impact.
+async function _refreshClosedPrices() {
+  const closed = trades.filter((t) => t.status === "closed");
+  if (!closed.length) return;
+
+  // One API call per unique symbol
+  const symbolMap = {};
+  closed.forEach((t) => { if (!symbolMap[t.symbol]) symbolMap[t.symbol] = t.exchange; });
+
+  const results = await Promise.all(
+    Object.entries(symbolMap).map(async ([symbol, exchange]) => {
+      const { price } = await fetchLivePrice(symbol, exchange);
+      return { symbol, price };
+    })
+  );
+
+  const priceMap = {};
+  results.forEach(({ symbol, price }) => { if (price !== null) priceMap[symbol] = price; });
+
+  let changed = false;
+  trades.forEach((t, idx) => {
+    if (t.status !== "closed" || priceMap[t.symbol] === undefined) return;
+    trades[idx].livePrice = priceMap[t.symbol];
+    changed = true;
+  });
+
+  if (changed) _renderTable();
+}
+
 // ─── Start / Restart Price Refresh ───────────────────────────────────────────
 // Always fetches once on load. Then auto-refreshes every 5s during market hours.
 function _startPriceRefresh() {
-  _refreshAllPrices(); // immediate fetch on load regardless of time
+  _refreshAllPrices();    // immediate fetch on load regardless of time
+  _refreshClosedPrices(); // closed trades: display-only, no calculations affected
   clearInterval(priceInterval);
   priceInterval = setInterval(() => {
-    if (_isMarketHours()) _refreshAllPrices();
-  }, 5000); // every 5 seconds
+    if (_isMarketHours()) {
+      _refreshAllPrices();
+      _refreshClosedPrices();
+    }
+  }, 5000);
 }
 
 // ─── Market Status ────────────────────────────────────────────────────────────
