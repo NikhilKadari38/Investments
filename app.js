@@ -597,26 +597,37 @@ function _updateSummary() {
     if (glow) glow.className = "sum-circle " + (unrealized >= 0 ? "sum-circle-glow" : "sum-circle-loss");
   }
 
-  // P/L oval
-  const plOval = document.querySelector(".sum-pl-oval");
+  // Unrealized P/L oval
+  const plOval = $("sumUnrealizedOval");
   const plVal  = $("sumUnrealized");
   const plPct  = $("sumUnrealizedPct");
   if (plVal)  plVal.textContent  = _fmt(unrealized);
   if (plPct)  plPct.textContent  = _fmtPct(unrealPct);
   if (plOval) plOval.className   = "sum-pl-oval " + (unrealized >= 0 ? "is-profit" : "is-loss");
 
-  // Day P/L pill
+  // Day P/L oval
   const dayPL = open.reduce((s, t) => {
     if (!t.livePrice || t.dayChangePct === null || t.dayChangePct === undefined) return s;
     const prevClose = t.livePrice * 100 / (100 + t.dayChangePct);
     return s + (t.livePrice - prevClose) * t.shares;
   }, 0);
-  const dayEl = $("sumDayPL");
-  if (dayEl) { dayEl.textContent = _fmt(dayPL); dayEl.className = "sum-r-val " + (dayPL >= 0 ? "profit" : "loss"); }
+  const dayPct = activeInvested > 0 ? (dayPL / activeInvested) * 100 : 0;
+  const dayOval = $("sumDayPLOval");
+  const dayValEl = $("sumDayPL");
+  const dayPctEl = $("sumDayPLPct");
+  if (dayValEl) dayValEl.textContent = _fmt(dayPL);
+  if (dayPctEl) dayPctEl.textContent = _fmtPct(dayPct);
+  if (dayOval)  dayOval.className    = "sum-pl-oval " + (dayPL >= 0 ? "is-profit" : "is-loss");
 
-  // Realized pill
-  const rEl = $("sumRealized");
-  if (rEl) { rEl.textContent = _fmt(realized); rEl.className = "sum-r-val " + (realized >= 0 ? "profit" : "loss"); }
+  // Realized Returns oval
+  const closedInvested = closed.reduce((s, t) => s + t.investedAmount, 0);
+  const realizedPct    = closedInvested > 0 ? (realized / closedInvested) * 100 : 0;
+  const realOval = $("sumRealizedOval");
+  const rEl      = $("sumRealized");
+  const rPctEl   = $("sumRealizedPct");
+  if (rEl)      rEl.textContent      = _fmt(realized);
+  if (rPctEl)   rPctEl.textContent   = _fmtPct(realizedPct);
+  if (realOval) realOval.className   = "sum-pl-oval " + (realized >= 0 ? "is-profit" : "is-loss");
 
   // Update ticker
   _updateTicker();
@@ -816,7 +827,7 @@ async function _fetchAndSavePrice(tradeId, symbol, exchange) {
 
   trades[idx].livePrice    = price;
   trades[idx].dayChangePct = dayChangePct;
-  const upd = { livePrice: price };
+  const upd = { livePrice: price, dayChangePct: dayChangePct ?? null };
   if (detected && !trades[idx].exchange) {
     trades[idx].exchange = detected;
     upd.exchange = detected;
