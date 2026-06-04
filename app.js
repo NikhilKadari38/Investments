@@ -605,6 +605,15 @@ function _updateSummary() {
   if (plPct)  plPct.textContent  = _fmtPct(unrealPct);
   if (plOval) plOval.className   = "sum-pl-oval " + (unrealized >= 0 ? "is-profit" : "is-loss");
 
+  // Day P/L pill
+  const dayPL = open.reduce((s, t) => {
+    if (!t.livePrice || t.dayChangePct === null || t.dayChangePct === undefined) return s;
+    const prevClose = t.livePrice * 100 / (100 + t.dayChangePct);
+    return s + (t.livePrice - prevClose) * t.shares;
+  }, 0);
+  const dayEl = $("sumDayPL");
+  if (dayEl) { dayEl.textContent = _fmt(dayPL); dayEl.className = "sum-r-val " + (dayPL >= 0 ? "profit" : "loss"); }
+
   // Realized pill
   const rEl = $("sumRealized");
   if (rEl) { rEl.textContent = _fmt(realized); rEl.className = "sum-r-val " + (realized >= 0 ? "profit" : "loss"); }
@@ -799,28 +808,6 @@ function _rotateTicker() {
   }));
 }
 
-// ─── Portfolio Context for Chatbot ────────────────────────────────────────────
-function _getPortfolioContext() {
-  const open   = trades.filter((t) => t.status === "open");
-  const closed = trades.filter((t) => t.status === "closed");
-  const totalInvested = open.reduce((s, t) => s + t.investedAmount, 0);
-  const realized      = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
-  const wins          = closed.filter((t) => (t.returns ?? 0) > 0).length;
-
-  const openStr = open.map((t) =>
-    t.symbol + "(" + t.shares + "sh @ ₹" + t.buyPrice +
-    (t.livePrice ? ", live ₹" + t.livePrice : "") + ")"
-  ).join(", ");
-
-  return [
-    "Portfolio: " + open.length + " open, " + closed.length + " closed trades.",
-    "Active invested: ₹" + totalInvested.toLocaleString("en-IN"),
-    "Realized returns: ₹" + realized.toLocaleString("en-IN"),
-    closed.length > 0 ? "Win rate: " + Math.round(wins / closed.length * 100) + "%" : "",
-    open.length > 0 ? "Open positions: " + openStr : "No open positions."
-  ].filter(Boolean).join("\n");
-}
-
 // ─── Live Prices ──────────────────────────────────────────────────────────────
 async function _fetchAndSavePrice(tradeId, symbol, exchange) {
   const { price, dayChangePct, exchange: detected } = await fetchLivePrice(symbol, exchange);
@@ -845,8 +832,8 @@ function _isMarketHours() {
   const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const day = ist.getDay();
   const min = ist.getHours() * 60 + ist.getMinutes();
-  // Mon–Fri, 9:00 AM to 3:30 PM IST
-  return day >= 1 && day <= 5 && min >= 540 && min <= 930;
+  // Mon–Fri, 9:15 AM to 3:30 PM IST
+  return day >= 1 && day <= 5 && min >= 555 && min <= 930;
 }
 
 // ─── Refresh All Prices ───────────────────────────────────────────────────────
