@@ -302,6 +302,61 @@ function _renderTable() {
   tbody.querySelectorAll(".btn-del").forEach((btn) =>
     btn.addEventListener("click", () => _confirmDelete(btn.dataset.id))
   );
+
+  // ── Totals footer ──────────────────────────────────────────────────────────
+  const table = $("tradeTable");
+  const oldFoot = table.querySelector("tfoot");
+  if (oldFoot) oldFoot.remove();
+
+  if (filtered.length > 1) {
+    const totalInvested = filtered.reduce((s, t) => s + t.investedAmount, 0);
+    let returnsVal = 0, plPct = 0, currValCell = "";
+
+    if (currentFilter === "open") {
+      const currVal = filtered.reduce((s, t) =>
+        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+      returnsVal = currVal - totalInvested;
+      plPct      = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      const cls  = returnsVal >= 0 ? "profit" : "loss";
+      currValCell = '<td class="td-mono ' + cls + '">' + _fmt(currVal) + '</td>';
+
+    } else if (currentFilter === "closed") {
+      returnsVal  = filtered.reduce((s, t) => s + (t.returns ?? 0), 0);
+      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      currValCell = '<td><span class="dash-val">–</span></td>';
+
+    } else { // all
+      const openF   = filtered.filter((t) => t.status === "open");
+      const closedF = filtered.filter((t) => t.status === "closed");
+      const currVal = openF.reduce((s, t) =>
+        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+      const unrealized = currVal - openF.reduce((s, t) => s + t.investedAmount, 0);
+      const realized   = closedF.reduce((s, t) => s + (t.returns ?? 0), 0);
+      returnsVal  = unrealized + realized;
+      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      const cls   = unrealized >= 0 ? "profit" : "loss";
+      currValCell = '<td class="td-mono ' + cls + '">' + _fmt(currVal) + '</td>';
+    }
+
+    const plClass = returnsVal >= 0 ? "profit" : "loss";
+    const dash    = '<td><span class="dash-val">–</span></td>';
+    const tfoot   = document.createElement("tfoot");
+    tfoot.innerHTML =
+      '<tr>' +
+        '<td class="totals-label">TOTALS</td>' +
+        '<td></td>' +                                                             // Symbol
+        '<td></td>' + '<td></td>' + '<td></td>' +                                 // Shares / Buy Price / Buy Date
+        '<td class="td-mono">'               + _fmt(totalInvested) + '</td>' +    // Invested
+        dash + dash +                                                              // Live Price / Day %
+        currValCell +                                                              // Curr. Value
+        dash + '<td></td>' +                                                       // Sell Price / Sell Date
+        '<td class="td-mono ' + plClass + '">' + _fmt(returnsVal)  + '</td>' +    // Returns
+        '<td class="td-mono ' + plClass + '">' + _fmtPct(plPct)    + '</td>' +    // P/L %
+        '<td></td><td></td>' +                                                     // Status / Delete
+      '</tr>';
+    table.appendChild(tfoot);
+  }
+
   _renderCards(filtered);
 }
 
@@ -370,6 +425,51 @@ function _renderCards(filtered) {
     card.querySelector(".tc-sell-btn")?.addEventListener("click", () => _openSellModal(trade.id));
     container.appendChild(card);
   });
+
+  // ── Mobile totals card ────────────────────────────────────────────────────
+  if (filtered.length > 1) {
+    const totalInvested = filtered.reduce((s, t) => s + t.investedAmount, 0);
+    let returnsVal = 0, plPct = 0, secondLabel = "Curr. Value", secondVal = "–";
+
+    if (currentFilter === "open") {
+      const currVal = filtered.reduce((s, t) =>
+        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+      returnsVal  = currVal - totalInvested;
+      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      secondLabel = "Curr. Value";
+      secondVal   = _fmt(currVal);
+
+    } else if (currentFilter === "closed") {
+      returnsVal  = filtered.reduce((s, t) => s + (t.returns ?? 0), 0);
+      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      secondLabel = "Returns";
+      secondVal   = _fmt(returnsVal);
+
+    } else {
+      const openF   = filtered.filter((t) => t.status === "open");
+      const closedF = filtered.filter((t) => t.status === "closed");
+      const currVal = openF.reduce((s, t) =>
+        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+      returnsVal  = (currVal - openF.reduce((s, t) => s + t.investedAmount, 0))
+                  + closedF.reduce((s, t) => s + (t.returns ?? 0), 0);
+      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
+      secondLabel = "Open Value";
+      secondVal   = _fmt(currVal);
+    }
+
+    const plClass = returnsVal >= 0 ? "profit" : "loss";
+    const totalsCard = document.createElement("div");
+    totalsCard.className = "totals-card";
+    totalsCard.innerHTML =
+      '<div class="tc-totals-title">Totals</div>' +
+      '<div class="tc-totals-grid">' +
+        '<div class="tc-field"><span class="tc-label">Invested</span><span class="tc-val">'       + _fmt(totalInvested) + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">' + secondLabel + '</span><span class="tc-val ' + plClass + '">' + secondVal + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">P/L</span><span class="tc-val '             + plClass + '">' + _fmt(returnsVal) + '</span></div>' +
+        '<div class="tc-field"><span class="tc-label">P/L %</span><span class="tc-val '           + plClass + '">' + _fmtPct(plPct)    + '</span></div>' +
+      '</div>';
+    container.appendChild(totalsCard);
+  }
 }
 
 // ─── Add Trade Modal ──────────────────────────────────────────────────────────
