@@ -117,8 +117,8 @@ function _initBgCanvas() {
     t += 0.012;
 
     const dark = isDark();
-    const dotColor  = dark ? '255,230,0'  : '224,123,0';
-    const lineColor = dark ? '255,230,0'  : '224,123,0';
+    const dotColor  = dark ? '249,115,22' : '234,107,0';
+    const lineColor = dark ? '249,115,22' : '234,107,0';
 
     // update + draw dots
     dots.forEach((d, i) => {
@@ -193,6 +193,11 @@ async function _initApp() {
   _startPriceRefresh();
   try { _initTicker(); }      catch(e) { console.error("Ticker init error:", e); }
   try { _initGraphToggle(); } catch(e) { console.error("Graph init error:", e); }
+  // Position filter thumb on the initially active tab
+  requestAnimationFrame(() => {
+    const active = document.querySelector(".filter-tab.active");
+    if (active) _moveFilterThumb(active);
+  });
 }
 
 // ─── Load Trades ──────────────────────────────────────────────────────────────
@@ -213,9 +218,20 @@ document.querySelectorAll(".filter-tab").forEach((tab) => {
     document.querySelectorAll(".filter-tab").forEach((t) => t.classList.remove("active"));
     tab.classList.add("active");
     currentFilter = tab.dataset.filter;
+    _moveFilterThumb(tab);
     _renderTable();
   });
 });
+
+function _moveFilterThumb(activeTab) {
+  const thumb     = document.querySelector(".filter-thumb");
+  const container = document.querySelector(".filter-tabs");
+  if (!thumb || !container) return;
+  const cRect = container.getBoundingClientRect();
+  const tRect = activeTab.getBoundingClientRect();
+  thumb.style.width     = tRect.width + "px";
+  thumb.style.transform = "translateX(" + (tRect.left - cRect.left) + "px)";
+}
 
 // ─── Render Table ─────────────────────────────────────────────────────────────
 function _renderTable() {
@@ -663,16 +679,11 @@ function _updateSummary() {
   const unrealPct      = activeInvested > 0 ? (unrealized / activeInvested) * 100 : 0;
   const realized       = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
 
-  // Circles
+  // Stat cards
   const invEl = $("sumActiveInvested");
   const curEl = $("sumCurrentValue");
-  if (invEl) { invEl.textContent = _fmtL(activeInvested); invEl.className = "sum-circ-val yellow"; }
-  if (curEl) {
-    curEl.textContent = _fmtL(currentValue);
-    curEl.className   = "sum-circ-val " + (unrealized >= 0 ? "profit" : "loss");
-    const glow = $("sumCurrentValue")?.closest(".sum-circle");
-    if (glow) glow.className = "sum-circle " + (unrealized >= 0 ? "sum-circle-glow" : "sum-circle-loss");
-  }
+  if (invEl) { invEl.textContent = _fmt(activeInvested); invEl.className = "sum-stat-val accent"; }
+  if (curEl) { curEl.textContent = _fmt(currentValue);   curEl.className = "sum-stat-val " + (unrealized >= 0 ? "profit" : "loss"); }
 
   // Unrealized P/L oval
   const plOval = $("sumUnrealizedOval");
@@ -736,6 +747,7 @@ function _renderCurrentGraph() {
 function _renderOverviewGraph() {
   const container = $("sumGraph");
   if (!container) return;
+  container.className = "sum-graph-area sum-graph-overview";
   const DEPOSITED = 350000;
   const open      = trades.filter((t) => t.status === "open");
   const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
@@ -751,62 +763,98 @@ function _renderOverviewGraph() {
     { label: "Current",   val: current,   cls: "cur" },
   ];
 
+  // Render bars at height:0 first, then animate to target after a frame
   container.innerHTML = bars.map((b) => {
     const h   = Math.max(14, Math.round((b.val / max) * maxH));
     const lbl = "₹" + (b.val / 100000).toFixed(1) + "L";
-    return '<div class="pop-col">' +
-      '<div class="pop-top-val">' + lbl + '</div>' +
+    return '<div class="pop-col" data-h="' + h + '">' +
+      '<div class="pop-top-val" style="opacity:0">' + lbl + '</div>' +
       '<div class="pop-stick-wrap">' +
-        '<div class="pop-stick ' + b.cls + '" style="height:' + h + 'px;"></div>' +
+        '<div class="pop-stick ' + b.cls + '" style="height:0;transition:none;"></div>' +
       '</div>' +
       '<div class="pop-lbl">' + b.label + '</div>' +
     '</div>';
   }).join("");
+
+  // Staggered grow animation — slow and satisfying
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    container.querySelectorAll(".pop-col").forEach((col, i) => {
+      const stick = col.querySelector(".pop-stick");
+      const label = col.querySelector(".pop-top-val");
+      const h = col.dataset.h;
+      setTimeout(() => {
+        stick.style.transition = "height 1.4s cubic-bezier(.22,1,.36,1)";
+        stick.style.height = h + "px";
+        label.style.transition = "opacity 0.8s ease 0.5s";
+        label.style.opacity = "1";
+      }, i * 180);
+    });
+  }));
 }
 
 function _renderTradesGraph() {
   const container = $("sumGraph");
   if (!container) return;
+  container.className = "sum-graph-area sum-graph-trades";
+
   const open = trades.filter((t) => t.status === "open");
   if (!open.length) {
-    container.innerHTML = '<span style="color:var(--text-3);font-size:12px;text-align:center;width:100%;padding-top:30px;">No open trades</span>';
+    container.innerHTML = '<span style="color:var(--text-3);font-size:12px;text-align:center;width:100%;">No open trades</span>';
     return;
   }
 
-  const maxInv  = Math.max(...open.map((t) => t.investedAmount), 1);
-  const maxPl   = Math.max(...open.map((t) => {
-    const curr = t.livePrice ? t.livePrice * t.shares : t.investedAmount;
-    return Math.abs(curr - t.investedAmount);
-  }), 1);
-  const maxH    = 90;
-  const maxOvH  = 40;
-
+  // Build rows with bars starting at width:0, store targets in data attributes
   container.innerHTML = open.map((t) => {
-    const baseH   = Math.max(14, Math.round((t.investedAmount / maxInv) * maxH));
-    const curr    = t.livePrice ? t.livePrice * t.shares : t.investedAmount;
-    const pl      = curr - t.investedAmount;
-    const ovH     = pl !== 0
-      ? Math.max(10, Math.round((Math.abs(pl) / maxPl) * maxOvH))
-      : 0;
-    const ovClass = pl >= 0 ? "profit" : "loss";
-    const plStr   = pl >= 0
-      ? "+" + (pl >= 1000 ? Math.round(pl / 1000) + "K" : Math.round(pl))
-      : "-" + (Math.abs(pl) >= 1000 ? Math.round(Math.abs(pl) / 1000) + "K" : Math.round(Math.abs(pl)));
-    const sym     = t.symbol.length > 6 ? t.symbol.slice(0, 6) + ".." : t.symbol;
+    const curr     = t.livePrice ? t.livePrice * t.shares : t.investedAmount;
+    const pl       = curr - t.investedAmount;
+    const isProfit = pl >= 0;
+    const plPct    = t.investedAmount > 0 ? (pl / t.investedAmount) * 100 : 0;
+    const sign     = isProfit ? "+" : "";
+    const sym      = t.symbol.length > 9 ? t.symbol.slice(0, 9) + "…" : t.symbol;
 
-    return '<div class="pop-col">' +
-      '<div class="pop-stick-wrap">' +
-        '<div class="pop-trade-base" style="height:' + baseH + 'px;">' +
-          (ovH > 0
-            ? '<div class="pop-trade-overlay ' + ovClass + '" style="height:' + ovH + 'px;">' +
-                '<span class="pop-ov-val">' + plStr + '</span>' +
-              '</div>'
-            : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="pop-lbl">' + sym + '</div>' +
+    let barHtml;
+    if (isProfit) {
+      const darkW  = curr > 0 ? Math.round((t.investedAmount / curr) * 100) : 100;
+      const lightW = 100 - darkW;
+      barHtml =
+        '<div class="hbar-track hbar-profit">' +
+          '<div class="hbar-seg profit-dark"  style="width:0" data-w="' + darkW  + '"></div>' +
+          '<div class="hbar-seg profit-light" style="width:0" data-w="' + lightW + '"></div>' +
+        '</div>';
+    } else {
+      const darkW = t.investedAmount > 0
+        ? Math.min(100, Math.round((curr / t.investedAmount) * 100))
+        : 0;
+      barHtml =
+        '<div class="hbar-track hbar-loss">' +
+          '<div class="hbar-seg loss-dark" style="width:0" data-w="' + darkW + '"></div>' +
+        '</div>';
+    }
+
+    return '<div class="hbar-row" style="opacity:0">' +
+      '<span class="hbar-sym">' + sym + '</span>' +
+      barHtml +
+      '<span class="hbar-pct ' + (isProfit ? "profit" : "loss") + '">' + sign + plPct.toFixed(2) + '%</span>' +
     '</div>';
   }).join("");
+
+  // Staggered slide-in + bar grow — slow and satisfying
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    container.querySelectorAll(".hbar-row").forEach((row, i) => {
+      setTimeout(() => {
+        row.style.transition = "opacity 0.4s ease";
+        row.style.opacity = "1";
+        row.querySelectorAll(".hbar-seg[data-w]").forEach((seg, j) => {
+          const targetW = seg.dataset.w;
+          // Slight delay between segments in the same bar (dark then light)
+          setTimeout(() => {
+            seg.style.transition = "width 1.3s cubic-bezier(.22,1,.36,1)";
+            seg.style.width = targetW + "%";
+          }, j * 120);
+        });
+      }, i * 160);
+    });
+  }));
 }
 
 // ─── Ticker Tape ─────────────────────────────────────────────────────────────
@@ -826,7 +874,7 @@ function _updateTicker() {
   const movers = [...open]
     .filter((t) => t.dayChangePct !== null && t.dayChangePct !== undefined)
     .sort((a, b) => Math.abs(b.dayChangePct) - Math.abs(a.dayChangePct))
-    .slice(0, 4);
+    .slice(0, 3);
 
   // Group 2 — top 4 portfolio gainers (by unrealized P/L %)
   const gainers = [...open]
@@ -836,7 +884,7 @@ function _updateTicker() {
       return { ...t, portfolioPct: parseFloat(pl.toFixed(2)) };
     })
     .sort((a, b) => b.portfolioPct - a.portfolioPct)
-    .slice(0, 4);
+    .slice(0, 3);
 
   window._tickerGroups = [
     { label: "Day Movers",   data: movers,  key: "dayChangePct" },
@@ -1036,11 +1084,6 @@ try {
 } catch(e) { console.error("Session check error:", e); }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
-function _fmtL(val) {
-  if (!val && val !== 0) return "–";
-  return "₹" + (val / 100000).toFixed(2) + "L";
-}
-
 function _fmt(val) {
   if (val === null || val === undefined || isNaN(val)) return "–";
   return "₹" + parseFloat(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

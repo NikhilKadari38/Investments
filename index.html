@@ -75,6 +75,7 @@
           <div class="section-title-group">
             <h1 class="section-title">Portfolio</h1>
             <div class="filter-tabs">
+              <div class="filter-thumb"></div>
               <button class="filter-tab active" data-filter="all">All</button>
               <button class="filter-tab" data-filter="open">Open</button>
               <button class="filter-tab" data-filter="closed">Closed</button>
@@ -127,28 +128,28 @@
       <aside class="section-right">
         <h2 class="sum-head">Summary</h2>
 
-        <!-- Deposited Capital -->
-        <div class="sum-dep-pill">
+        <!-- Hero: Deposited Capital -->
+        <div class="sum-hero">
           <div>
-            <div class="sum-dep-label">Deposited Capital</div>
-            <div class="sum-dep-val">₹3,50,000</div>
+            <div class="sum-hero-label">Deposited Capital</div>
+            <div class="sum-hero-val">₹3,50,000</div>
           </div>
-          <div class="sum-dep-coin">₹</div>
+          <div class="sum-hero-badge">₹</div>
         </div>
 
-        <!-- Circles -->
-        <div class="sum-circles">
-          <div class="sum-circle">
-            <span class="sum-circ-label">Active<br>Invested</span>
-            <span class="sum-circ-val yellow" id="sumActiveInvested">₹0</span>
+        <!-- Stat pair -->
+        <div class="sum-stat-pair">
+          <div class="sum-stat-card">
+            <div class="sum-stat-label">Active Invested</div>
+            <div class="sum-stat-val" id="sumActiveInvested">–</div>
           </div>
-          <div class="sum-circle sum-circle-glow">
-            <span class="sum-circ-label">Current<br>Value</span>
-            <span class="sum-circ-val" id="sumCurrentValue">₹0</span>
+          <div class="sum-stat-card">
+            <div class="sum-stat-label">Current Value</div>
+            <div class="sum-stat-val" id="sumCurrentValue">–</div>
           </div>
         </div>
 
-        <!-- Unrealized P/L oval -->
+        <!-- P/L cards (keep same IDs + class sum-pl-oval for JS) -->
         <div class="sum-pl-oval" id="sumUnrealizedOval">
           <div>
             <div class="sum-pl-label">Unrealized P/L</div>
@@ -157,7 +158,6 @@
           <span class="sum-pl-pct" id="sumUnrealizedPct">0%</span>
         </div>
 
-        <!-- Day P/L oval -->
         <div class="sum-pl-oval" id="sumDayPLOval">
           <div>
             <div class="sum-pl-label">Day P/L</div>
@@ -166,7 +166,6 @@
           <span class="sum-pl-pct" id="sumDayPLPct">0%</span>
         </div>
 
-        <!-- Realized Returns oval -->
         <div class="sum-pl-oval" id="sumRealizedOval">
           <div>
             <div class="sum-pl-label">Realized Returns</div>
