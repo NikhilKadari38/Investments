@@ -308,7 +308,7 @@ function _renderTable() {
   const oldFoot = table.querySelector("tfoot");
   if (oldFoot) oldFoot.remove();
 
-  if (filtered.length > 1) {
+  if (filtered.length > 1 && currentFilter !== "all") {
     const totalInvested = filtered.reduce((s, t) => s + t.investedAmount, 0);
     let returnsVal = 0, plPct = 0, currValCell = "";
 
@@ -320,22 +320,10 @@ function _renderTable() {
       const cls  = returnsVal >= 0 ? "profit" : "loss";
       currValCell = '<td class="td-mono ' + cls + '">' + _fmt(currVal) + '</td>';
 
-    } else if (currentFilter === "closed") {
+    } else { // closed
       returnsVal  = filtered.reduce((s, t) => s + (t.returns ?? 0), 0);
       plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
       currValCell = '<td><span class="dash-val">–</span></td>';
-
-    } else { // all
-      const openF   = filtered.filter((t) => t.status === "open");
-      const closedF = filtered.filter((t) => t.status === "closed");
-      const currVal = openF.reduce((s, t) =>
-        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
-      const unrealized = currVal - openF.reduce((s, t) => s + t.investedAmount, 0);
-      const realized   = closedF.reduce((s, t) => s + (t.returns ?? 0), 0);
-      returnsVal  = unrealized + realized;
-      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
-      const cls   = unrealized >= 0 ? "profit" : "loss";
-      currValCell = '<td class="td-mono ' + cls + '">' + _fmt(currVal) + '</td>';
     }
 
     const plClass = returnsVal >= 0 ? "profit" : "loss";
@@ -427,7 +415,7 @@ function _renderCards(filtered) {
   });
 
   // ── Mobile totals card ────────────────────────────────────────────────────
-  if (filtered.length > 1) {
+  if (filtered.length > 1 && currentFilter !== "all") {
     const totalInvested = filtered.reduce((s, t) => s + t.investedAmount, 0);
     let returnsVal = 0, plPct = 0, secondLabel = "Curr. Value", secondVal = "–";
 
@@ -439,22 +427,11 @@ function _renderCards(filtered) {
       secondLabel = "Curr. Value";
       secondVal   = _fmt(currVal);
 
-    } else if (currentFilter === "closed") {
+    } else { // closed
       returnsVal  = filtered.reduce((s, t) => s + (t.returns ?? 0), 0);
       plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
       secondLabel = "Returns";
       secondVal   = _fmt(returnsVal);
-
-    } else {
-      const openF   = filtered.filter((t) => t.status === "open");
-      const closedF = filtered.filter((t) => t.status === "closed");
-      const currVal = openF.reduce((s, t) =>
-        s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
-      returnsVal  = (currVal - openF.reduce((s, t) => s + t.investedAmount, 0))
-                  + closedF.reduce((s, t) => s + (t.returns ?? 0), 0);
-      plPct       = totalInvested > 0 ? (returnsVal / totalInvested) * 100 : 0;
-      secondLabel = "Open Value";
-      secondVal   = _fmt(currVal);
     }
 
     const plClass = returnsVal >= 0 ? "profit" : "loss";
