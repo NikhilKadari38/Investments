@@ -16,6 +16,7 @@
   --surface-3:   #0C110C;
   --border:      #182418;
   --border-2:    #1E3228;
+  --card-border: rgba(200,150,80,0.18);
 
   --text-1:      #EDE8E2;
   --text-2:      #7A7268;
@@ -54,6 +55,7 @@
   --surface-3:   #EDE5DC;
   --border:      #E0D4C8;
   --border-2:    #EAE0D6;
+  --card-border: rgba(0,0,0,0.18);
 
   --text-1:      #1A1008;
   --text-2:      #7A5A3A;
@@ -150,11 +152,11 @@ a { color: var(--accent); text-decoration: none; }
 }
 .login-box {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: var(--r);
   padding: 44px 38px;
   width: 360px;
-  box-shadow: 0 0 0 1px var(--accent-dim), 0 8px 40px rgba(0,0,0,.60), 0 0 60px var(--accent-dim);
+  box-shadow: 0 8px 40px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.10);
   display: flex; flex-direction: column; align-items: center; gap: 20px;
   animation: slideUp .22s ease; position: relative; z-index: 1;
 }
@@ -167,7 +169,7 @@ a { color: var(--accent); text-decoration: none; }
 .login-logo svg { width: 36px; height: 36px; }
 .login-box h2 {
   font-family: var(--ff-display); font-size: 22px; font-weight: 700;
-  color: var(--text-1); letter-spacing: -.3px; text-align: center; font-style: italic;
+  color: var(--text-1); letter-spacing: -.3px; text-align: center;
 }
 .login-box input[type="password"] {
   width: 100%; background: var(--surface-2); border: 1px solid var(--border);
@@ -532,9 +534,9 @@ a { color: var(--accent); text-decoration: none; }
   .app { height: auto; min-height: 100vh; overflow: visible; }
   .main-content { flex-direction: column; overflow: visible; height: auto; }
 
-  /* ── Summary panel — stacked, full width ── */
+  /* ── Summary panel — stacked full width, shows first ── */
   .section-right {
-    width: 100%; border-left: none;
+    width: 100%; border-left: none; order: -1;
     border-bottom: 1px solid var(--border);
     padding: 16px 14px 14px; gap: 10px; overflow: visible;
   }
@@ -544,8 +546,9 @@ a { color: var(--accent); text-decoration: none; }
   /* Stat pair: two columns still fine on mobile */
   .sum-stat-pair { gap: 8px; }
   .sum-stat-card { padding: 12px 12px; }
-  .sum-stat-val  { font-size: 13px; }
+  .sum-stat-val  { font-size: 16px; }
   .sum-stat-label { font-size: 8px; }
+  .cur-val-pct { font-size: 10px; padding: 2px 6px; }
   /* P/L cards: compact */
   .sum-pl-oval { padding: 11px 14px; }
   .sum-pl-val  { font-size: 16px; }
@@ -746,6 +749,7 @@ a { color: var(--accent); text-decoration: none; }
 .sum-hero {
   background: var(--hero-bg); border-radius: var(--r);
   box-shadow: var(--hero-shadow); padding: 18px 18px;
+  border: 1px solid var(--card-border);
   display: flex; align-items: center; justify-content: space-between;
 }
 .sum-hero-label {
@@ -771,6 +775,7 @@ a { color: var(--accent); text-decoration: none; }
 .sum-stat-card {
   background: var(--surface); border-radius: var(--r);
   box-shadow: var(--card-shadow); padding: 14px 14px;
+  border: 1px solid var(--card-border);
   transition: box-shadow var(--tx), transform var(--tx);
   cursor: default;
 }
@@ -781,18 +786,27 @@ a { color: var(--accent); text-decoration: none; }
   margin-bottom: 9px;
 }
 .sum-stat-val {
-  font-family: var(--ff-display); font-size: 15px; font-weight: 700;
+  font-family: var(--ff-display); font-size: 19px; font-weight: 700;
   color: var(--text-1); letter-spacing: -.2px;
   font-variant-numeric: tabular-nums; word-break: break-all;
+  display: flex; flex-direction: column; align-items: flex-start;
 }
 .sum-stat-val.accent { color: var(--accent); }
 .sum-stat-val.profit { color: var(--profit); }
 .sum-stat-val.loss   { color: var(--loss); }
+.cur-val-pct {
+  align-self: flex-end; margin-top: 6px;
+  font-family: var(--ff-head); font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 20px; letter-spacing: .2px;
+}
+.cur-val-pct.profit { background: var(--profit-muted); color: var(--profit); }
+.cur-val-pct.loss   { background: var(--loss-muted);   color: var(--loss); }
 
 /* P/L cards — rectangular cards, NOT pills */
 .sum-pl-oval {
   background: var(--surface); border-radius: var(--r);
   box-shadow: var(--card-shadow); padding: 14px 16px;
+  border: 1px solid var(--card-border);
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   transition: box-shadow var(--tx), transform var(--tx); cursor: default;
 }

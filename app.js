@@ -682,8 +682,22 @@ function _updateSummary() {
   // Stat cards
   const invEl = $("sumActiveInvested");
   const curEl = $("sumCurrentValue");
-  if (invEl) { invEl.textContent = _fmt(activeInvested); invEl.className = "sum-stat-val accent"; }
-  if (curEl) { curEl.textContent = _fmt(currentValue);   curEl.className = "sum-stat-val " + (unrealized >= 0 ? "profit" : "loss"); }
+  const DEPOSITED    = 350000;
+  const vsDeposited  = ((currentValue   - DEPOSITED) / DEPOSITED) * 100;
+  const vsInvested   = ((activeInvested - DEPOSITED) / DEPOSITED) * 100;
+  const vsDepClass   = currentValue   >= DEPOSITED ? "profit" : "loss";
+  const vsInvClass   = activeInvested >= DEPOSITED ? "profit" : "loss";
+
+  if (invEl) {
+    invEl.innerHTML = _fmt(activeInvested) +
+      '<span class="cur-val-pct ' + vsInvClass + '">' + (vsInvested >= 0 ? "+" : "") + vsInvested.toFixed(2) + "%</span>";
+    invEl.className = "sum-stat-val accent";
+  }
+  if (curEl) {
+    curEl.innerHTML = _fmt(currentValue) +
+      '<span class="cur-val-pct ' + vsDepClass + '">' + (vsDeposited >= 0 ? "+" : "") + vsDeposited.toFixed(2) + "%</span>";
+    curEl.className = "sum-stat-val " + (unrealized >= 0 ? "profit" : "loss");
+  }
 
   // Unrealized P/L oval
   const plOval = $("sumUnrealizedOval");
