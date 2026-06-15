@@ -731,6 +731,12 @@ function _updateSummary() {
   if (rPctEl)   rPctEl.textContent   = _fmtPct(realizedPct);
   if (realOval) realOval.className   = "sum-pl-oval " + (realized >= 0 ? "is-profit" : "is-loss");
 
+  // Available Funds
+  const freeFunds  = DEPOSITED + realized - activeInvested;
+  const freeEl     = $("sumFreeFunds");
+  if (freeEl) freeEl.textContent = _fmt(freeFunds);
+
+
   // Update ticker
   _updateTicker();
 

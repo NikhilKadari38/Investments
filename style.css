@@ -740,7 +740,7 @@ a { color: var(--accent); text-decoration: none; }
 
 /* "SUMMARY" heading — Playfair Display, elegant */
 .sum-head {
-  font-family: var(--ff-display); font-size: 20px; font-weight: 700;
+  font-family: var(--ff-display); font-size: 26px; font-weight: 700;
   color: var(--text-1); letter-spacing: .5px; text-align: center;
   margin-bottom: 2px;
 }
@@ -831,6 +831,25 @@ a { color: var(--accent); text-decoration: none; }
 .sum-pl-oval.is-profit .sum-pl-pct { background: var(--profit-bg); color: var(--profit); }
 .sum-pl-oval.is-loss   .sum-pl-val { color: var(--loss); }
 .sum-pl-oval.is-loss   .sum-pl-pct { background: var(--loss-bg); color: var(--loss); }
+
+/* Available Funds card */
+.sum-free-card {
+  background: var(--hero-bg); border-radius: var(--r);
+  padding: 10px 14px; display: flex; flex-direction: row;
+  align-items: center; justify-content: space-between;
+}
+.sum-free-label {
+  font-family: var(--ff-head); font-size: 9px; font-weight: 600;
+  letter-spacing: 1.4px; text-transform: uppercase; color: rgba(255,255,255,.55);
+  margin-bottom: 3px;
+}
+.sum-free-val {
+  font-family: var(--ff-display); font-size: 18px; font-weight: 700;
+  color: #FFFFFF; letter-spacing: -.4px; font-variant-numeric: tabular-nums;
+}
+.sum-free-sub {
+  font-family: var(--ff-head); font-size: 9px; color: rgba(255,255,255,.35);
+}
 
 /* Graph section */
 .sum-graph-sep { width: 100%; height: 1px; background: var(--border); }
