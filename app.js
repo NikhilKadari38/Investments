@@ -708,8 +708,13 @@ function _updateSummary() {
   if (plOval) plOval.className   = "sum-pl-oval " + (unrealized >= 0 ? "is-profit" : "is-loss");
 
   // Day P/L oval
+  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const dayPL = open.reduce((s, t) => {
-    if (!t.livePrice || t.dayChangePct === null || t.dayChangePct === undefined) return s;
+    if (!t.livePrice) return s;
+    if (t.buyDate === todayIST) {
+      return s + (t.livePrice - t.buyPrice) * t.shares;
+    }
+    if (t.dayChangePct === null || t.dayChangePct === undefined) return s;
     const prevClose = t.livePrice * 100 / (100 + t.dayChangePct);
     return s + (t.livePrice - prevClose) * t.shares;
   }, 0);
