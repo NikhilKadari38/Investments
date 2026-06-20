@@ -775,17 +775,21 @@ function _renderOverviewGraph() {
   container.className = "sum-graph-area sum-graph-overview";
   const DEPOSITED = 350000;
   const open      = trades.filter((t) => t.status === "open");
+  const closed    = trades.filter((t) => t.status === "closed");
   const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
   const current   = open.reduce((s, t) =>
     s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+  const realized  = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
+  const available = DEPOSITED + realized - invested;
 
-  const max  = Math.max(DEPOSITED, invested, current, 1);
+  const max  = Math.max(DEPOSITED, invested, current, available, 1);
   const maxH = 90;
 
   const bars = [
     { label: "Deposited", val: DEPOSITED, cls: "dep" },
     { label: "Invested",  val: invested,  cls: "inv" },
     { label: "Current",   val: current,   cls: "cur" },
+    { label: "Available", val: available,  cls: "avl" },
   ];
 
   // Render bars at height:0 first, then animate to target after a frame
