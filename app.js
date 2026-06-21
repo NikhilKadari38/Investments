@@ -1233,14 +1233,18 @@ function _startPriceRefresh() {
   }, 5000);
 }
 
-// ─── AI Portfolio Monitor ─────────────────────────────────────────────────────
+// ─── Tara Chat ───────────────────────────────────────────────────────────────
 const AI_WORKER = "https://nk-price-proxy.lotuswhite9392.workers.dev";
-let _aiInterval = null;
-let _aiLastRun  = 0;
+let _aiInterval  = null;
+let _aiLastRun   = 0;
+let _chatHistory = [];
 
 function _initAIMonitor() {
   const closeBtn  = $("aiClose");
   const toggleBtn = $("aiToggle");
+  const sendBtn   = $("aiChatSend");
+  const chatInput = $("aiChatInput");
+
   if (closeBtn) closeBtn.addEventListener("click", () => {
     const d = $("aiDialogue");
     d.classList.add("closing");
@@ -1250,19 +1254,19 @@ function _initAIMonitor() {
       d.removeEventListener("animationend", handler);
     }, { once: true });
   });
+
   if (toggleBtn) toggleBtn.addEventListener("click", () => {
     const d = $("aiDialogue");
     const rect = toggleBtn.getBoundingClientRect();
     d.style.right = (window.innerWidth - rect.left) + "px";
-
     if (d.classList.contains("hidden")) {
       d.classList.remove("hidden");
       d.classList.remove("closing");
       d.style.animation = "none";
       d.offsetHeight;
       d.style.animation = "";
-      // Manual click: run analysis if not recently run
-      if (Date.now() - _aiLastRun > 60000) _runPortfolioAI();
+      if (_chatHistory.length === 0) _autoGreet();
+      if (chatInput) chatInput.focus();
     } else {
       d.classList.add("closing");
       d.addEventListener("animationend", function handler() {
@@ -1273,122 +1277,146 @@ function _initAIMonitor() {
     }
   });
 
-  // Auto-run only during market hours: first check 45s after login
+  if (sendBtn && chatInput) {
+    sendBtn.addEventListener("click", () => _sendChat());
+    chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") _sendChat(); });
+  }
+
+  // Auto-run during market hours
   setTimeout(() => {
     if (_isMarketHours()) {
-      const hasLive = trades.some((t) => t.status === "open" && t.livePrice);
-      if (hasLive) _runPortfolioAI();
-      else setTimeout(() => { if (_isMarketHours()) _runPortfolioAI(); }, 30000);
+      const hasLive = _tradesForFund().some((t) => t.status === "open" && t.livePrice);
+      if (hasLive) _autoPortfolioCheck();
     }
   }, 45000);
-
-  // Re-run every 30 mins, only during market hours
   _aiInterval = setInterval(() => {
-    if (_isMarketHours() && Date.now() - _aiLastRun > 1700000) _runPortfolioAI();
+    if (_isMarketHours() && Date.now() - _aiLastRun > 1700000) _autoPortfolioCheck();
   }, 1800000);
 }
 
-async function _runPortfolioAI() {
+function _autoGreet() {
+  const fundTrades = _tradesForFund();
+  const open = fundTrades.filter((t) => t.status === "open");
+  if (open.length === 0) {
+    _addChatMsg("tara", "Hey! No stocks in " + FUND_CONFIG[currentFund].name + " yet. Add some trades and I'll keep an eye on them for you.");
+  } else {
+    _addChatMsg("tara", "Hey! I'm watching your " + FUND_CONFIG[currentFund].name + " portfolio (" + open.length + " stocks). Ask me anything — or I'll check in automatically during market hours.");
+  }
+}
+
+function _autoPortfolioCheck() {
   const fundTrades = _tradesForFund();
   const open = fundTrades.filter((t) => t.status === "open" && t.livePrice);
-
-  const dialogue = $("aiDialogue");
-  const body     = $("aiDialogueBody");
-  const timeEl   = $("aiTime");
-  if (!dialogue || !body) return;
-
-  if (open.length === 0) {
-    dialogue.classList.remove("hidden");
-    const aiBtn = $("aiToggle");
-    if (aiBtn) { const rect = aiBtn.getBoundingClientRect(); dialogue.style.right = (window.innerWidth - rect.left) + "px"; }
-    body.innerHTML = '<div class="ai-dialogue-placeholder">No stocks in ' + FUND_CONFIG[currentFund].name + '. Add trades to get Tara insights.</div>';
-    if (timeEl) timeEl.textContent = "";
-    return;
-  }
-
+  if (open.length === 0) return;
   _aiLastRun = Date.now();
+  _sendToTara(_buildPortfolioContext() + "\nGive a quick portfolio check. Per-stock verdict, alerts, and cash advice. Under 200 words.");
+}
 
-  dialogue.classList.remove("hidden");
-  const aiBtn = $("aiToggle");
-  if (aiBtn) {
-    const rect = aiBtn.getBoundingClientRect();
-    dialogue.style.right = (window.innerWidth - rect.left) + "px";
-  }
-  body.innerHTML = '<div class="ai-dialogue-placeholder"><div class="res-spinner"></div> Tara is analyzing portfolio...</div>';
+function _sendChat() {
+  const input = $("aiChatInput");
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+  _addChatMsg("user", msg);
+  const context = _buildPortfolioContext();
+  _sendToTara(context + "\n\nUser asks: " + msg);
+}
 
+function _buildPortfolioContext() {
+  const fundTrades = _tradesForFund();
+  const open = fundTrades.filter((t) => t.status === "open");
+  const closed = fundTrades.filter((t) => t.status === "closed");
   const DEPOSITED = FUND_CONFIG[currentFund].deposited;
-  const closed    = trades.filter((t) => t.status === "closed");
-  const realized  = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
-  const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
-  const current   = open.reduce((s, t) => s + t.livePrice * t.shares, 0);
-  const unrealized = current - invested;
-  const freeCash  = DEPOSITED + realized - invested;
-
-  let portfolio = "PORTFOLIO SUMMARY:\n" +
-    "Deposited: ₹" + DEPOSITED + " | Invested: ₹" + invested.toFixed(0) +
-    " | Current: ₹" + current.toFixed(0) + " | Free Cash: ₹" + freeCash.toFixed(0) +
-    " | Unrealized P/L: ₹" + unrealized.toFixed(0) +
-    " (" + (invested > 0 ? (unrealized / invested * 100).toFixed(1) : "0") + "%)" +
-    " | Realized: ₹" + realized.toFixed(0) + "\n\nOPEN POSITIONS:\n";
-
+  const realized = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
+  const invested = open.reduce((s, t) => s + t.investedAmount, 0);
+  const current = open.reduce((s, t) => s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
+  const freeCash = DEPOSITED + realized - invested;
   const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
-  open.forEach((t) => {
-    const pl = (t.livePrice * t.shares) - t.investedAmount;
-    const plPct = (pl / t.investedAmount * 100).toFixed(1);
-    const dayStr = t.dayChangePct != null ? (t.dayChangePct >= 0 ? "+" : "") + t.dayChangePct + "%" : "N/A";
-    const buyDate = t.buyDate || "unknown";
-    const daysHeld = buyDate !== "unknown" ? Math.floor((new Date(todayIST) - new Date(buyDate)) / 86400000) : "?";
-    portfolio += t.symbol + ": " + t.shares + " shares @ ₹" + t.buyPrice +
-      " → ₹" + t.livePrice + " (P/L: " + (pl >= 0 ? "+" : "") + plPct + "%, Day: " + dayStr +
-      ", Bought: " + buyDate + ", Held: " + daysHeld + " days)\n";
-  });
+  let ctx = "PORTFOLIO (" + FUND_CONFIG[currentFund].name + "):\n" +
+    "Deposited: ₹" + DEPOSITED + " | Invested: ₹" + invested.toFixed(0) +
+    " | Current: ₹" + current.toFixed(0) + " | Free: ₹" + freeCash.toFixed(0) +
+    " | Realized: ₹" + realized.toFixed(0) + "\n";
 
-  const prompt = portfolio +
-    "\nYou are TARA, my personal trading monitor. Respond in EXACTLY this format:\n\n" +
-    "OVERALL: [🟢/🟡/🔴] [one line portfolio sentiment]\n\n" +
-    "For EACH stock, give one line:\n" +
-    "[SYMBOL]: [🟢 HOLD / 🟡 WATCH / 🔴 EXIT / ⭐ BOOK PROFIT] — [specific reason with price level]\n\n" +
-    "ALERTS (only if urgent):\n" +
-    "⚠️ [alert text — e.g. stock held >14 days in loss, broken key level, volume spike]\n\n" +
-    "CASH (₹" + freeCash.toFixed(0) + " free):\n" +
-    "[Deploy now / Wait — one line why]\n\n" +
-    "Keep it under 250 words. No disclaimers. Use the holding days to flag stocks held too long in loss.";
+  if (open.length > 0) {
+    ctx += "\nOPEN:\n";
+    open.forEach((t) => {
+      const pl = (t.livePrice ? t.livePrice * t.shares : t.investedAmount) - t.investedAmount;
+      const plPct = (pl / t.investedAmount * 100).toFixed(1);
+      const dayStr = t.dayChangePct != null ? (t.dayChangePct >= 0 ? "+" : "") + t.dayChangePct + "%" : "?";
+      const daysHeld = t.buyDate ? Math.floor((new Date(todayIST) - new Date(t.buyDate)) / 86400000) : "?";
+      ctx += t.symbol + ": " + t.shares + "sh @₹" + t.buyPrice + " →₹" + (t.livePrice || "?") +
+        " (" + (pl >= 0 ? "+" : "") + plPct + "%, Day:" + dayStr + ", " + daysHeld + "d held)\n";
+    });
+  }
+  return ctx;
+}
+
+async function _sendToTara(prompt) {
+  const msgs = $("aiChatMessages");
+  if (!msgs) return;
+
+  // Show typing indicator
+  const typing = document.createElement("div");
+  typing.className = "ai-chat-typing";
+  typing.innerHTML = '<div class="res-spinner" style="width:14px;height:14px"></div> Tara is thinking...';
+  msgs.appendChild(typing);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Build messages array with history for context
+  const apiMessages = [];
+  _chatHistory.forEach((m) => {
+    apiMessages.push({ role: m.role === "tara" ? "assistant" : "user", content: m.text });
+  });
+  apiMessages.push({ role: "user", content: prompt });
 
   try {
     const res = await fetch(AI_WORKER + "?type=ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt: apiMessages.map(m => m.role + ": " + m.content).join("\n") }),
     });
     const data = await res.json();
+    typing.remove();
+
     if (data.analysis) {
-      const formatted = data.analysis
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/^(OVERALL|ALERTS|CASH):?\s*/gm, '<span class="ai-section-label">$1</span> ')
-        .replace(/(🔴\s*EXIT)/g, '<span class="ai-tag-exit">$1</span>')
-        .replace(/(⭐\s*BOOK PROFIT)/g, '<span class="ai-tag-book">$1</span>')
-        .replace(/(🟡\s*WATCH)/g, '<span class="ai-tag-watch">$1</span>')
-        .replace(/(🟢\s*HOLD)/g, '<span class="ai-tag-hold">$1</span>')
-        .replace(/⚠️/g, '<span class="ai-alert-icon">⚠️</span>')
-        .replace(/\n/g, '<br>');
-      body.innerHTML = '<div class="ai-dialogue-text">' + formatted + '</div>';
+      _addChatMsg("tara", data.analysis);
+      _aiLastRun = Date.now();
+      const timeEl = $("aiTime");
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
       // Toast for urgent alerts
       if (data.analysis.includes("EXIT") || data.analysis.includes("⚠️")) {
-        const alertLines = data.analysis.split("\n").filter(l => l.includes("EXIT") || l.includes("⚠️"));
-        if (alertLines.length > 0) _toast(alertLines[0].replace(/[🔴⚠️]/g, "").trim(), "error");
+        const line = data.analysis.split("\n").find(l => l.includes("EXIT") || l.includes("⚠️"));
+        if (line) _toast(line.replace(/[🔴⚠️]/g, "").trim(), "error");
       }
     } else {
-      body.innerHTML = '<div class="ai-dialogue-placeholder">Tara could not analyze right now.</div>';
+      typing.remove();
+      _addChatMsg("tara", "I couldn't process that. Try asking differently.");
     }
-  } catch (err) {
-    body.innerHTML = '<div class="ai-dialogue-placeholder">Tara unavailable. Will retry next check.</div>';
+  } catch {
+    typing.remove();
+    _addChatMsg("tara", "Connection issue. Try again in a moment.");
   }
+}
 
-  if (timeEl) {
-    timeEl.textContent = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-  }
+function _addChatMsg(role, text) {
+  const msgs = $("aiChatMessages");
+  if (!msgs) return;
+  _chatHistory.push({ role, text });
+  const div = document.createElement("div");
+  div.className = "ai-chat-msg " + role;
+  div.innerHTML = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^(OVERALL|ALERTS|CASH):?\s*/gm, '<span class="ai-section-label">$1</span> ')
+    .replace(/(🔴\s*EXIT)/g, '<span class="ai-tag-exit">$1</span>')
+    .replace(/(⭐\s*BOOK PROFIT)/g, '<span class="ai-tag-book">$1</span>')
+    .replace(/(🟡\s*WATCH)/g, '<span class="ai-tag-watch">$1</span>')
+    .replace(/(🟢\s*HOLD)/g, '<span class="ai-tag-hold">$1</span>')
+    .replace(/\n/g, '<br>');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
 }
 
 // ─── Market Status ────────────────────────────────────────────────────────────

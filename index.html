@@ -325,12 +325,14 @@
   <!-- ── AI Insight Dialogue ─────────────────────────────────────────────── -->
   <div class="ai-dialogue hidden" id="aiDialogue">
     <div class="ai-dialogue-header">
-      <span class="ai-dialogue-title">Tara Insights</span>
-      <span class="ai-dialogue-time" id="aiTime">–</span>
+      <span class="ai-dialogue-title">Tara</span>
+      <span class="ai-dialogue-time" id="aiTime"></span>
       <button class="ai-dialogue-close" id="aiClose">✕</button>
     </div>
-    <div class="ai-dialogue-body" id="aiDialogueBody">
-      <div class="ai-dialogue-placeholder">Watching your portfolio...</div>
+    <div class="ai-chat-messages" id="aiChatMessages"></div>
+    <div class="ai-chat-input-row">
+      <input type="text" id="aiChatInput" placeholder="Ask Tara anything..." autocomplete="off" spellcheck="false" />
+      <button id="aiChatSend" class="ai-chat-send">➤</button>
     </div>
   </div>
 
