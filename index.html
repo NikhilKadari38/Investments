@@ -11,6 +11,8 @@
   <meta name="apple-mobile-web-app-title" content="Trade Tracker" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.min.js"></script>
 </head>
 <body>
 
@@ -54,9 +56,11 @@
         </div>
       </div>
       <nav class="nav">
-        <a href="#" class="nav-link active">Portfolio</a>
+        <a class="nav-link active" data-page="portfolio">Portfolio</a>
+        <a class="nav-link" data-page="research">Research</a>
       </nav>
       <div class="header-right">
+        <button class="ai-header-btn" id="aiToggle" title="Ask Tara">Ask Tara</button>
         <div class="market-status">
           <span class="status-dot" id="marketStatusDot"></span>
           <span id="marketStatusText">–</span>
@@ -66,14 +70,24 @@
       </div>
     </header>
 
-    <!-- Main -->
-    <main class="main-content">
+    <!-- Portfolio Page -->
+    <main id="page-portfolio" class="main-content">
 
       <!-- ── Left: Trades Table ──────────────────────────────────────── -->
       <section class="section-left">
         <div class="section-header">
           <div class="section-title-group">
             <h1 class="section-title">Portfolio</h1>
+            <div class="platform-picker" id="platformPicker">
+              <button class="platform-selected" id="platformBtn">
+                <span id="platformName">Zerodha</span>
+                <span class="platform-arrow">▾</span>
+              </button>
+              <div class="platform-menu hidden" id="platformMenu">
+                <div class="platform-item" data-fund="zerodha">Zerodha</div>
+                <div class="platform-item" data-fund="groww">Groww</div>
+              </div>
+            </div>
             <div class="filter-tabs">
               <div class="filter-thumb"></div>
               <button class="filter-tab active" data-filter="all">All</button>
@@ -113,7 +127,7 @@
                 <th>Returns</th>
                 <th>P/L %</th>
                 <th>Status</th>
-                <th></th>
+                <th>Days</th>
               </tr>
             </thead>
             <tbody id="tradeTableBody"></tbody>
@@ -132,7 +146,7 @@
         <div class="sum-hero">
           <div>
             <div class="sum-hero-label">Deposited Capital</div>
-            <div class="sum-hero-val">₹3,50,000</div>
+            <div class="sum-hero-val" id="sumDepositedVal">₹3,50,000</div>
           </div>
           <div class="sum-hero-badge">₹</div>
         </div>
@@ -199,6 +213,25 @@
       </aside>
 
     </main>
+
+    <!-- Research Page -->
+    <main id="page-research" class="research-page hidden">
+      <div class="research-container">
+        <h1 class="section-title">Research</h1>
+        <div class="res-search">
+          <input type="text" id="researchSymbol" placeholder="Enter stock symbol (e.g. RELIANCE)" autocomplete="off" spellcheck="false" />
+          <button id="researchBtn" class="btn-primary res-btn">Analyze</button>
+        </div>
+        <div id="researchResults" class="res-results">
+          <div class="res-empty">
+            <div class="res-empty-icon">📊</div>
+            <div class="res-empty-text">Enter a stock symbol to analyze</div>
+            <div class="res-empty-sub">Get RSI, MACD, momentum, volume analysis & overall signal</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
   </div>
 
   <!-- ── Add Trade Modal ────────────────────────────────────────────────── -->
@@ -286,6 +319,18 @@
         <button class="btn-cancel" id="cancelSell">Cancel</button>
         <button class="btn-primary btn-sell-confirm" id="confirmSell">Confirm Sell</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── AI Insight Dialogue ─────────────────────────────────────────────── -->
+  <div class="ai-dialogue hidden" id="aiDialogue">
+    <div class="ai-dialogue-header">
+      <span class="ai-dialogue-title">Tara Insights</span>
+      <span class="ai-dialogue-time" id="aiTime">–</span>
+      <button class="ai-dialogue-close" id="aiClose">✕</button>
+    </div>
+    <div class="ai-dialogue-body" id="aiDialogueBody">
+      <div class="ai-dialogue-placeholder">Watching your portfolio...</div>
     </div>
   </div>
 

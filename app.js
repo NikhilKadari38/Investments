@@ -6,12 +6,19 @@ import {
   query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { fetchLivePrice } from "./prices.js";
+import { initResearch } from "./research.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
 let currentFilter   = "all";
 let activeSellId    = null;
 let priceInterval   = null;
+let currentFund     = localStorage.getItem("currentFund") || "zerodha";
+
+const FUND_CONFIG = {
+  zerodha: { name: "Zerodha", deposited: 350000, color: "#F97316" },
+  groww:   { name: "Groww",   deposited: 0,      color: "#5367FF" },
+};
 
 // ─── DOM Helper ───────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -73,9 +80,165 @@ async function _showApp() {
   $("app").classList.remove("hidden");
   _initBgCanvas();
   _initMobile();
+  _initRouter();
   await _initApp();
+  _applyFund();
+  initResearch(trades, currentFund);
+  _initAIMonitor();
 }
 
+// ─── SPA Router (hash-based) ─────────────────────────────────────────────────
+function _getCurrentPage() {
+  const hash = location.hash.replace("#", "").toLowerCase();
+  return hash === "research" ? "research" : "portfolio";
+}
+
+function _navigateTo(page) {
+  location.hash = page === "research" ? "Research" : "Portfolio";
+}
+
+function _showPage(page) {
+  const portfolio = $("page-portfolio");
+  const research  = $("page-research");
+  const fab       = $("fabAdd");
+  if (portfolio) portfolio.classList.toggle("hidden", page !== "portfolio");
+  if (research)  research.classList.toggle("hidden", page !== "research");
+  if (fab)       fab.classList.toggle("hidden", page !== "portfolio");
+  document.querySelectorAll(".nav-link").forEach((l) => {
+    l.classList.toggle("active", l.dataset.page === page);
+  });
+}
+
+function _initRouter() {
+  document.querySelectorAll(".nav-link[data-page]").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (link.dataset.page === "research") {
+        const container = document.querySelector(".research-container");
+        if (container && container.classList.contains("has-results")) {
+          container.classList.remove("has-results");
+          const results = $("researchResults");
+          const input = $("researchSymbol");
+          if (input) input.value = "";
+          if (results) {
+            results.innerHTML = "";
+            if (typeof initResearch === "function") {
+              // Re-import won't work, so trigger suggestions manually
+              const evt = new Event("research-reset");
+              document.dispatchEvent(evt);
+            }
+          }
+        }
+      }
+      _navigateTo(link.dataset.page);
+    });
+  });
+
+  // Platform picker
+  const platBtn  = $("platformBtn");
+  const platMenu = $("platformMenu");
+  const platPicker = $("platformPicker");
+  if (platBtn && platMenu) {
+    platBtn.addEventListener("click", () => {
+      platMenu.classList.toggle("hidden");
+      platPicker.classList.toggle("open");
+      platMenu.querySelectorAll(".platform-item").forEach(i => i.classList.toggle("active", i.dataset.fund === currentFund));
+    });
+    platMenu.querySelectorAll(".platform-item").forEach(item => {
+      item.addEventListener("click", () => {
+        currentFund = item.dataset.fund;
+        localStorage.setItem("currentFund", currentFund);
+        platMenu.classList.add("hidden");
+        platPicker.classList.remove("open");
+        _applyFund();
+      });
+    });
+    document.addEventListener("click", (e) => {
+      if (!platPicker.contains(e.target)) { platMenu.classList.add("hidden"); platPicker.classList.remove("open"); }
+    });
+  }
+
+  window.addEventListener("hashchange", () => _showPage(_getCurrentPage()));
+  _showPage(_getCurrentPage());
+}
+
+
+// ─── Fund Switcher ───────────────────────────────────────────────────────────
+function _applyFund() {
+  const config = FUND_CONFIG[currentFund];
+
+  // Load custom deposited capital from localStorage for non-zerodha funds
+  if (currentFund !== "zerodha") {
+    const saved = localStorage.getItem("depositedCapital_" + currentFund);
+    if (saved) config.deposited = parseInt(saved);
+  }
+
+  // Update deposited capital display
+  const heroEl = $("sumDepositedVal");
+  if (heroEl) {
+    if (currentFund === "zerodha") {
+      heroEl.textContent = "₹" + Number(config.deposited).toLocaleString("en-IN");
+      heroEl.onclick = null;
+      heroEl.style.cursor = "default";
+    } else {
+      if (config.deposited > 0) {
+        heroEl.textContent = "₹" + Number(config.deposited).toLocaleString("en-IN");
+      } else {
+        heroEl.textContent = "Click to set capital";
+      }
+      heroEl.style.cursor = "pointer";
+      heroEl.onclick = () => _editDepositedCapital();
+    }
+  }
+
+  const freeLabel = document.querySelector(".sum-free-sub");
+  if (freeLabel) freeLabel.textContent = "In " + config.name + " funds";
+
+  // Sync picker display
+  const pName = $("platformName");
+  if (pName) pName.textContent = config.name;
+
+  _renderTable();
+  _updateSummary();
+  _renderCurrentGraph();
+
+  // Re-init research with new fund context
+  initResearch(trades, currentFund);
+  const resResults = $("researchResults");
+  const resContainer = document.querySelector(".research-container");
+  if (resContainer && resContainer.classList.contains("has-results")) {
+    resContainer.classList.remove("has-results");
+    if (resResults) resResults.innerHTML = "";
+    document.dispatchEvent(new Event("research-reset"));
+  }
+}
+
+function _editDepositedCapital() {
+  const heroEl = $("sumDepositedVal");
+  if (!heroEl) return;
+  const config = FUND_CONFIG[currentFund];
+  const input = document.createElement("input");
+  input.type = "number";
+  input.className = "sum-hero-val-input";
+  input.value = config.deposited || "";
+  input.placeholder = "Enter amount";
+  heroEl.textContent = "";
+  heroEl.appendChild(input);
+  input.focus();
+
+  const save = () => {
+    const val = parseInt(input.value) || 0;
+    FUND_CONFIG[currentFund].deposited = val;
+    localStorage.setItem("depositedCapital_" + currentFund, val);
+    _applyFund();
+  };
+  input.addEventListener("blur", save);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+}
+
+function _tradesForFund() {
+  return trades.filter((t) => (t.fund || "zerodha") === currentFund);
+}
 
 // ─── Animated Background Canvas ──────────────────────────────────────────────
 function _initBgCanvas() {
@@ -235,7 +398,8 @@ function _moveFilterThumb(activeTab) {
 
 // ─── Render Table ─────────────────────────────────────────────────────────────
 function _renderTable() {
-  const filtered = trades.filter((t) => {
+  const fundTrades = _tradesForFund();
+  const filtered = fundTrades.filter((t) => {
     if (currentFilter === "open")   return t.status === "open";
     if (currentFilter === "closed") return t.status === "closed";
     return true;
@@ -307,7 +471,7 @@ function _renderTable() {
       '<td class="td-mono '    + plClass + '">' + (plVal !== null ? _fmt(plVal) : '<span class="dash-val">–</span>') + '</td>' +
       '<td class="td-mono '    + plClass + '">' + (plPct !== null ? _fmtPct(plPct) : '<span class="dash-val">–</span>') + '</td>' +
       '<td><span class="status-badge ' + trade.status + '">' + (trade.status === "open" ? "Open" : "Closed") + '</span></td>' +
-      '<td><button class="btn-del" data-id="' + trade.id + '" title="Delete">✕</button></td>';
+      '<td>' + _daysHeldCell(trade) + '</td>';
 
     tbody.appendChild(tr);
   });
@@ -411,7 +575,7 @@ function _renderCards(filtered) {
           '<span class="status-badge ' + trade.status + '">' + (isClosed ? "Closed" : "Open") + '</span>' +
         '</div>' +
         '<div class="tc-actions">' +
-          '<button class="btn-del" data-id="' + trade.id + '">✕</button>' +
+          (isClosed ? '<span class="days-held">' + _daysHeldLabel(trade) + '</span>' : '<button class="btn-del" data-id="' + trade.id + '">✕</button>') +
         '</div>' +
       '</div>' +
       '<div class="tc-grid">' +
@@ -510,7 +674,7 @@ $("confirmAddTrade").addEventListener("click", async () => {
 
   try {
     const data = {
-      symbol, exchange, shares, buyPrice, buyDate, investedAmount,
+      symbol, exchange, shares, buyPrice, buyDate, investedAmount, fund: currentFund,
       sellShares: null, sellPrice: null, sellDate: null,
       sellAmount: null, returns: null, plPercent: null, livePrice: null,
       status: "open", createdAt: serverTimestamp()
@@ -669,8 +833,9 @@ async function _confirmDelete(tradeId) {
 
 // ─── Summary Panel ───────────────────────────────────────────────────────────
 function _updateSummary() {
-  const open   = trades.filter((t) => t.status === "open");
-  const closed = trades.filter((t) => t.status === "closed");
+  const fundTrades = _tradesForFund();
+  const open   = fundTrades.filter((t) => t.status === "open");
+  const closed = fundTrades.filter((t) => t.status === "closed");
 
   const activeInvested = open.reduce((s, t) => s + t.investedAmount, 0);
   const currentValue   = open.reduce((s, t) =>
@@ -682,7 +847,7 @@ function _updateSummary() {
   // Stat cards
   const invEl = $("sumActiveInvested");
   const curEl = $("sumCurrentValue");
-  const DEPOSITED    = 350000;
+  const DEPOSITED    = FUND_CONFIG[currentFund].deposited;
   const vsDeposited  = ((currentValue   - DEPOSITED) / DEPOSITED) * 100;
   const vsInvested   = ((activeInvested - DEPOSITED) / DEPOSITED) * 100;
   const vsDepClass   = currentValue   >= DEPOSITED ? "profit" : "loss";
@@ -773,9 +938,10 @@ function _renderOverviewGraph() {
   const container = $("sumGraph");
   if (!container) return;
   container.className = "sum-graph-area sum-graph-overview";
-  const DEPOSITED = 350000;
-  const open      = trades.filter((t) => t.status === "open");
-  const closed    = trades.filter((t) => t.status === "closed");
+  const DEPOSITED = FUND_CONFIG[currentFund].deposited;
+  const fundTrades = _tradesForFund();
+  const open      = fundTrades.filter((t) => t.status === "open");
+  const closed    = fundTrades.filter((t) => t.status === "closed");
   const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
   const current   = open.reduce((s, t) =>
     s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0);
@@ -897,7 +1063,20 @@ function _initTicker() {
 }
 
 function _updateTicker() {
-  const open = trades.filter((t) => t.status === "open");
+  const fundTrades = _tradesForFund();
+  const open = fundTrades.filter((t) => t.status === "open");
+
+  // No trades — show scrolling message
+  if (open.length === 0) {
+    const label = $("tickerLabel");
+    const elA = $("tickerA");
+    const elB = $("tickerB");
+    if (label) label.textContent = "";
+    if (elA) elA.innerHTML = '<span class="ticker-empty-msg">Add stocks to start tracking your ' + FUND_CONFIG[currentFund].name + ' portfolio</span>';
+    if (elB) elB.innerHTML = '';
+    window._tickerGroups = [];
+    return;
+  }
 
   // Group 1 — top 4 biggest day movers (by absolute dayChangePct)
   const movers = [...open]
@@ -1054,6 +1233,164 @@ function _startPriceRefresh() {
   }, 5000);
 }
 
+// ─── AI Portfolio Monitor ─────────────────────────────────────────────────────
+const AI_WORKER = "https://nk-price-proxy.lotuswhite9392.workers.dev";
+let _aiInterval = null;
+let _aiLastRun  = 0;
+
+function _initAIMonitor() {
+  const closeBtn  = $("aiClose");
+  const toggleBtn = $("aiToggle");
+  if (closeBtn) closeBtn.addEventListener("click", () => {
+    const d = $("aiDialogue");
+    d.classList.add("closing");
+    d.addEventListener("animationend", function handler() {
+      d.classList.add("hidden");
+      d.classList.remove("closing");
+      d.removeEventListener("animationend", handler);
+    }, { once: true });
+  });
+  if (toggleBtn) toggleBtn.addEventListener("click", () => {
+    const d = $("aiDialogue");
+    const rect = toggleBtn.getBoundingClientRect();
+    d.style.right = (window.innerWidth - rect.left) + "px";
+
+    if (d.classList.contains("hidden")) {
+      d.classList.remove("hidden");
+      d.classList.remove("closing");
+      d.style.animation = "none";
+      d.offsetHeight;
+      d.style.animation = "";
+      // Manual click: run analysis if not recently run
+      if (Date.now() - _aiLastRun > 60000) _runPortfolioAI();
+    } else {
+      d.classList.add("closing");
+      d.addEventListener("animationend", function handler() {
+        d.classList.add("hidden");
+        d.classList.remove("closing");
+        d.removeEventListener("animationend", handler);
+      }, { once: true });
+    }
+  });
+
+  // Auto-run only during market hours: first check 45s after login
+  setTimeout(() => {
+    if (_isMarketHours()) {
+      const hasLive = trades.some((t) => t.status === "open" && t.livePrice);
+      if (hasLive) _runPortfolioAI();
+      else setTimeout(() => { if (_isMarketHours()) _runPortfolioAI(); }, 30000);
+    }
+  }, 45000);
+
+  // Re-run every 30 mins, only during market hours
+  _aiInterval = setInterval(() => {
+    if (_isMarketHours() && Date.now() - _aiLastRun > 1700000) _runPortfolioAI();
+  }, 1800000);
+}
+
+async function _runPortfolioAI() {
+  const fundTrades = _tradesForFund();
+  const open = fundTrades.filter((t) => t.status === "open" && t.livePrice);
+
+  const dialogue = $("aiDialogue");
+  const body     = $("aiDialogueBody");
+  const timeEl   = $("aiTime");
+  if (!dialogue || !body) return;
+
+  if (open.length === 0) {
+    dialogue.classList.remove("hidden");
+    const aiBtn = $("aiToggle");
+    if (aiBtn) { const rect = aiBtn.getBoundingClientRect(); dialogue.style.right = (window.innerWidth - rect.left) + "px"; }
+    body.innerHTML = '<div class="ai-dialogue-placeholder">No stocks in ' + FUND_CONFIG[currentFund].name + '. Add trades to get Tara insights.</div>';
+    if (timeEl) timeEl.textContent = "";
+    return;
+  }
+
+  _aiLastRun = Date.now();
+
+  dialogue.classList.remove("hidden");
+  const aiBtn = $("aiToggle");
+  if (aiBtn) {
+    const rect = aiBtn.getBoundingClientRect();
+    dialogue.style.right = (window.innerWidth - rect.left) + "px";
+  }
+  body.innerHTML = '<div class="ai-dialogue-placeholder"><div class="res-spinner"></div> Tara is analyzing portfolio...</div>';
+
+  const DEPOSITED = FUND_CONFIG[currentFund].deposited;
+  const closed    = trades.filter((t) => t.status === "closed");
+  const realized  = closed.reduce((s, t) => s + (t.returns ?? 0), 0);
+  const invested  = open.reduce((s, t) => s + t.investedAmount, 0);
+  const current   = open.reduce((s, t) => s + t.livePrice * t.shares, 0);
+  const unrealized = current - invested;
+  const freeCash  = DEPOSITED + realized - invested;
+
+  let portfolio = "PORTFOLIO SUMMARY:\n" +
+    "Deposited: ₹" + DEPOSITED + " | Invested: ₹" + invested.toFixed(0) +
+    " | Current: ₹" + current.toFixed(0) + " | Free Cash: ₹" + freeCash.toFixed(0) +
+    " | Unrealized P/L: ₹" + unrealized.toFixed(0) +
+    " (" + (invested > 0 ? (unrealized / invested * 100).toFixed(1) : "0") + "%)" +
+    " | Realized: ₹" + realized.toFixed(0) + "\n\nOPEN POSITIONS:\n";
+
+  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+  open.forEach((t) => {
+    const pl = (t.livePrice * t.shares) - t.investedAmount;
+    const plPct = (pl / t.investedAmount * 100).toFixed(1);
+    const dayStr = t.dayChangePct != null ? (t.dayChangePct >= 0 ? "+" : "") + t.dayChangePct + "%" : "N/A";
+    const buyDate = t.buyDate || "unknown";
+    const daysHeld = buyDate !== "unknown" ? Math.floor((new Date(todayIST) - new Date(buyDate)) / 86400000) : "?";
+    portfolio += t.symbol + ": " + t.shares + " shares @ ₹" + t.buyPrice +
+      " → ₹" + t.livePrice + " (P/L: " + (pl >= 0 ? "+" : "") + plPct + "%, Day: " + dayStr +
+      ", Bought: " + buyDate + ", Held: " + daysHeld + " days)\n";
+  });
+
+  const prompt = portfolio +
+    "\nYou are TARA, my personal trading monitor. Respond in EXACTLY this format:\n\n" +
+    "OVERALL: [🟢/🟡/🔴] [one line portfolio sentiment]\n\n" +
+    "For EACH stock, give one line:\n" +
+    "[SYMBOL]: [🟢 HOLD / 🟡 WATCH / 🔴 EXIT / ⭐ BOOK PROFIT] — [specific reason with price level]\n\n" +
+    "ALERTS (only if urgent):\n" +
+    "⚠️ [alert text — e.g. stock held >14 days in loss, broken key level, volume spike]\n\n" +
+    "CASH (₹" + freeCash.toFixed(0) + " free):\n" +
+    "[Deploy now / Wait — one line why]\n\n" +
+    "Keep it under 250 words. No disclaimers. Use the holding days to flag stocks held too long in loss.";
+
+  try {
+    const res = await fetch(AI_WORKER + "?type=ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    if (data.analysis) {
+      const formatted = data.analysis
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^(OVERALL|ALERTS|CASH):?\s*/gm, '<span class="ai-section-label">$1</span> ')
+        .replace(/(🔴\s*EXIT)/g, '<span class="ai-tag-exit">$1</span>')
+        .replace(/(⭐\s*BOOK PROFIT)/g, '<span class="ai-tag-book">$1</span>')
+        .replace(/(🟡\s*WATCH)/g, '<span class="ai-tag-watch">$1</span>')
+        .replace(/(🟢\s*HOLD)/g, '<span class="ai-tag-hold">$1</span>')
+        .replace(/⚠️/g, '<span class="ai-alert-icon">⚠️</span>')
+        .replace(/\n/g, '<br>');
+      body.innerHTML = '<div class="ai-dialogue-text">' + formatted + '</div>';
+
+      // Toast for urgent alerts
+      if (data.analysis.includes("EXIT") || data.analysis.includes("⚠️")) {
+        const alertLines = data.analysis.split("\n").filter(l => l.includes("EXIT") || l.includes("⚠️"));
+        if (alertLines.length > 0) _toast(alertLines[0].replace(/[🔴⚠️]/g, "").trim(), "error");
+      }
+    } else {
+      body.innerHTML = '<div class="ai-dialogue-placeholder">Tara could not analyze right now.</div>';
+    }
+  } catch (err) {
+    body.innerHTML = '<div class="ai-dialogue-placeholder">Tara unavailable. Will retry next check.</div>';
+  }
+
+  if (timeEl) {
+    timeEl.textContent = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+}
+
 // ─── Market Status ────────────────────────────────────────────────────────────
 function _updateMarketStatus() {
   const ist  = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -1127,4 +1464,24 @@ function _fmtDate(str) {
   if (!str) return "–";
   const [y, m, d] = str.split("-");
   return d + "/" + m + "/" + y.slice(2);
+}
+
+function _daysHeldLabel(trade) {
+  if (!trade.buyDate) return "–";
+  const end = trade.status === "closed" && trade.sellDate ? trade.sellDate : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  return Math.floor((new Date(end) - new Date(trade.buyDate)) / 86400000) + "d";
+}
+
+function _daysHeldCell(trade) {
+  if (!trade.buyDate) return '<span class="dash-val">–</span>';
+  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const endDate = trade.status === "closed" && trade.sellDate ? trade.sellDate : todayIST;
+  const days = Math.floor((new Date(endDate) - new Date(trade.buyDate)) / 86400000);
+  const label = days + "d";
+  if (trade.status === "closed") {
+    return '<span class="days-held">' + label + '</span>';
+  }
+  const cls = days > 14 ? "days-warn" : days > 10 ? "days-caution" : "days-ok";
+  return '<span class="days-held ' + cls + '">' + label + '</span>' +
+    '<button class="btn-del" data-id="' + trade.id + '" title="Delete">✕</button>';
 }
