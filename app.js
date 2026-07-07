@@ -7,6 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { fetchLivePrice } from "./prices.js";
 import { initResearch } from "./research.js";
+import { initIntraday } from "./intraday.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
@@ -90,23 +91,30 @@ async function _showApp() {
 // ─── SPA Router (hash-based) ─────────────────────────────────────────────────
 function _getCurrentPage() {
   const hash = location.hash.replace("#", "").toLowerCase();
-  return hash === "research" ? "research" : "portfolio";
+  if (hash === "research")  return "research";
+  if (hash === "intraday")  return "intraday";
+  return "portfolio";
 }
 
 function _navigateTo(page) {
-  location.hash = page === "research" ? "Research" : "Portfolio";
+  if (page === "research")  { location.hash = "Research";  return; }
+  if (page === "intraday")  { location.hash = "Intraday";  return; }
+  location.hash = "Portfolio";
 }
 
 function _showPage(page) {
   const portfolio = $("page-portfolio");
+  const intraday  = $("page-intraday");
   const research  = $("page-research");
   const fab       = $("fabAdd");
   if (portfolio) portfolio.classList.toggle("hidden", page !== "portfolio");
-  if (research)  research.classList.toggle("hidden", page !== "research");
+  if (intraday)  intraday.classList.toggle("hidden",  page !== "intraday");
+  if (research)  research.classList.toggle("hidden",  page !== "research");
   if (fab)       fab.classList.toggle("hidden", page !== "portfolio");
   document.querySelectorAll(".nav-link").forEach((l) => {
     l.classList.toggle("active", l.dataset.page === page);
   });
+  if (page === "intraday") initIntraday(currentFund);
 }
 
 function _initRouter() {
@@ -160,6 +168,13 @@ function _initRouter() {
 
   window.addEventListener("hashchange", () => _showPage(_getCurrentPage()));
   _showPage(_getCurrentPage());
+
+  // Intraday platform picker dispatches this when fund changes from intraday page
+  document.addEventListener("nktt-fund-change", (e) => {
+    currentFund = e.detail.fund;
+    localStorage.setItem("currentFund", currentFund);
+    _applyFund();
+  });
 }
 
 
@@ -201,6 +216,9 @@ function _applyFund() {
   _renderTable();
   _updateSummary();
   _renderCurrentGraph();
+
+  // Re-init intraday if on that page
+  if (_getCurrentPage() === "intraday") initIntraday(currentFund);
 
   // Re-init research with new fund context
   initResearch(trades, currentFund);
@@ -1309,7 +1327,7 @@ function _autoPortfolioCheck() {
   const open = fundTrades.filter((t) => t.status === "open" && t.livePrice);
   if (open.length === 0) return;
   _aiLastRun = Date.now();
-  _sendToTara(_buildPortfolioContext() + "\nGive a quick portfolio check. Per-stock verdict, alerts, and cash advice. Under 200 words.");
+  _sendToTara(_buildPortfolioContext() + "\nGive a quick portfolio check. Per-stock verdict, alerts, and cash advice. Under 200 words. Do NOT mention next check time, scheduling, or when you will run again.");
 }
 
 function _sendChat() {

@@ -57,6 +57,7 @@
       </div>
       <nav class="nav">
         <a class="nav-link active" data-page="portfolio">Portfolio</a>
+        <a class="nav-link" data-page="intraday">Intraday</a>
         <a class="nav-link" data-page="research">Research</a>
       </nav>
       <div class="header-right">
@@ -214,6 +215,33 @@
 
     </main>
 
+    <!-- Intraday Page -->
+    <main id="page-intraday" class="main-content hidden">
+      <section class="section-left">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h1 class="section-title">Intraday</h1>
+            <div class="platform-picker" id="intradayPlatformPicker">
+              <button class="platform-selected" id="intradayPlatformBtn">
+                <span id="intradayPlatformName">Zerodha</span>
+                <span class="platform-arrow">▾</span>
+              </button>
+              <div class="platform-menu hidden" id="intradayPlatformMenu">
+                <div class="platform-item" data-fund="zerodha">Zerodha</div>
+                <div class="platform-item" data-fund="groww">Groww</div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-add" id="intradayAddBtn">+ Add Trade</button>
+        </div>
+        <div id="intradayLog" class="intraday-log"></div>
+        <div id="intradayEmpty" class="empty-state" style="display:none">
+          <p>No intraday trades yet — click <strong>+ Add Trade</strong> to start.</p>
+        </div>
+      </section>
+      <aside class="section-right" id="intradaySummary"></aside>
+    </main>
+
     <!-- Research Page -->
     <main id="page-research" class="research-page hidden">
       <div class="research-container">
@@ -333,6 +361,84 @@
     <div class="ai-chat-input-row">
       <input type="text" id="aiChatInput" placeholder="Ask Tara anything..." autocomplete="off" spellcheck="false" />
       <button id="aiChatSend" class="ai-chat-send">➤</button>
+    </div>
+  </div>
+
+  <!-- ── Intraday Add/Edit Modal ──────────────────────────────────────────── -->
+  <div id="intradayModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="intradayModalTitle">Add Intraday Trade</h3>
+        <button class="modal-close" id="idModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="idInputDate">Date</label>
+            <input type="date" id="idInputDate" />
+          </div>
+          <div class="form-group">
+            <label for="idInputSymbol">Symbol</label>
+            <input type="text" id="idInputSymbol" placeholder="e.g. BANKNIFTY" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Direction</label>
+          <div class="id-dir-toggle">
+            <button id="idDirLong" class="id-dir-btn active">▲ LONG &nbsp; Buy → Sell</button>
+            <button id="idDirShort" class="id-dir-btn">▼ SHORT &nbsp; Sell → Buy</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="idInputQty">Quantity</label>
+            <input type="number" id="idInputQty" placeholder="0" min="1" step="1" />
+          </div>
+          <div class="form-group">
+            <label for="idInputEntry" id="idEntryLabel">Buy Price</label>
+            <input type="number" id="idInputEntry" placeholder="0.00" step="0.01" min="0" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="idInputExit" id="idExitLabel">Sell Price</label>
+            <input type="number" id="idInputExit" placeholder="0.00" step="0.01" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Gross P/L</label>
+            <div id="idGrossDisplay" class="id-gross-display">–</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="idCancelBtn">Cancel</button>
+        <button class="btn-primary" id="idSaveBtn">Save Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Withdrawal Modal ───────────────────────────────────────────────────── -->
+  <div id="withdrawModal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Log Withdrawal</h3>
+        <button class="modal-close" id="withdrawCloseBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="withdrawMaxLabel" class="id-withdraw-max"></p>
+        <div class="form-group">
+          <label for="withdrawAmountInput">Amount (₹)</label>
+          <input type="number" id="withdrawAmountInput" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="withdrawNoteInput">Note (optional)</label>
+          <input type="text" id="withdrawNoteInput" placeholder="e.g. Sent to Rahul" autocomplete="off" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="withdrawCancelBtn">Cancel</button>
+        <button class="btn-primary" id="withdrawConfirmBtn">Log Withdrawal</button>
+      </div>
     </div>
   </div>
 
