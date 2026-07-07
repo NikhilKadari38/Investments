@@ -14,7 +14,8 @@ let trades          = [];
 let currentFilter   = "all";
 let activeSellId    = null;
 let priceInterval   = null;
-let currentFund     = localStorage.getItem("currentFund") || "zerodha";
+let currentFund     = localStorage.getItem("portfolioFund")  || "zerodha";
+let intradayFund    = localStorage.getItem("intradayFund")   || "groww";
 
 const FUND_CONFIG = {
   zerodha: { name: "Zerodha", deposited: 350000, color: "#F97316" },
@@ -114,7 +115,7 @@ function _showPage(page) {
   document.querySelectorAll(".nav-link").forEach((l) => {
     l.classList.toggle("active", l.dataset.page === page);
   });
-  if (page === "intraday") initIntraday(currentFund);
+  if (page === "intraday") initIntraday(intradayFund);
 }
 
 function _initRouter() {
@@ -155,7 +156,7 @@ function _initRouter() {
     platMenu.querySelectorAll(".platform-item").forEach(item => {
       item.addEventListener("click", () => {
         currentFund = item.dataset.fund;
-        localStorage.setItem("currentFund", currentFund);
+        localStorage.setItem("portfolioFund", currentFund);
         platMenu.classList.add("hidden");
         platPicker.classList.remove("open");
         _applyFund();
@@ -169,11 +170,11 @@ function _initRouter() {
   window.addEventListener("hashchange", () => _showPage(_getCurrentPage()));
   _showPage(_getCurrentPage());
 
-  // Intraday platform picker dispatches this when fund changes from intraday page
+  // Intraday platform picker — only updates intraday fund, never touches portfolio
   document.addEventListener("nktt-fund-change", (e) => {
-    currentFund = e.detail.fund;
-    localStorage.setItem("currentFund", currentFund);
-    _applyFund();
+    intradayFund = e.detail.fund;
+    localStorage.setItem("intradayFund", intradayFund);
+    initIntraday(intradayFund);
   });
 }
 
@@ -216,9 +217,6 @@ function _applyFund() {
   _renderTable();
   _updateSummary();
   _renderCurrentGraph();
-
-  // Re-init intraday if on that page
-  if (_getCurrentPage() === "intraday") initIntraday(currentFund);
 
   // Re-init research with new fund context
   initResearch(trades, currentFund);

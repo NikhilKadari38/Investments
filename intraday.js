@@ -29,7 +29,7 @@ function _fmt(v) {
 
 // ── Entry Point ───────────────────────────────────────────────────────────────
 export async function initIntraday(fund) {
-  _fund = fund || localStorage.getItem("currentFund") || "zerodha";
+  _fund = fund || localStorage.getItem("intradayFund") || "groww";
   await _loadAll();
   _render();
   if (!_initialized) {
@@ -677,7 +677,7 @@ function _bindEvents() {
       item.addEventListener("click", () => {
         platMenu.classList.add("hidden");
         platPicker.classList.remove("open");
-        // Dispatch global fund change — app.js listens and calls initIntraday + applyFund
+        // Dispatch intraday-only fund change — app.js updates intradayFund, never touches portfolio
         document.dispatchEvent(new CustomEvent("nktt-fund-change", { detail: { fund: item.dataset.fund } }));
       });
     });
