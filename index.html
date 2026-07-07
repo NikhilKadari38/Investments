@@ -364,6 +364,22 @@
     </div>
   </div>
 
+  <!-- ── Intraday Confirm / Prompt Popup ──────────────────────────────────── -->
+  <div id="idConfirmModal" class="modal-overlay hidden">
+    <div class="modal modal-sm id-confirm-modal">
+      <div class="modal-body id-confirm-body">
+        <div class="id-confirm-icon" id="idConfirmIcon"></div>
+        <div class="id-confirm-title" id="idConfirmTitle"></div>
+        <div class="id-confirm-msg" id="idConfirmMsg"></div>
+        <input id="idConfirmInput" class="id-confirm-input hidden" type="number" step="0.01" min="0" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="idConfirmCancel">Cancel</button>
+        <button class="btn-primary" id="idConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Intraday Add/Edit Modal ──────────────────────────────────────────── -->
   <div id="intradayModal" class="modal-overlay hidden">
     <div class="modal">

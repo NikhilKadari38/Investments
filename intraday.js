@@ -111,91 +111,122 @@ function _buildDateGroup(date, trades) {
   const actual   = _dayActuals[date];
   const charges  = actual !== undefined ? grossSum - actual : null;
   const grossCls = grossSum >= 0 ? "profit" : "loss";
+  const n        = trades.length;
 
   const label = new Date(date + "T12:00:00").toLocaleDateString("en-IN", {
     weekday: "short", day: "numeric", month: "short", year: "numeric"
   });
 
   const group = document.createElement("div");
-  group.className  = "id-group";
+  group.className    = "id-group";
   group.dataset.date = date;
 
-  group.innerHTML = `
-    <div class="id-group-header">
-      <span class="id-group-date">${label}</span>
-      <span class="id-group-count">${trades.length} trade${trades.length !== 1 ? "s" : ""}</span>
-    </div>
-    <div class="id-table">
-      <div class="id-thead">
-        <span>Type</span><span>Symbol</span><span>Qty</span>
-        <span>Entry</span><span>Exit</span><span>P/L</span><span></span>
-      </div>
-    </div>
+  // Header
+  const header = document.createElement("div");
+  header.className = "id-group-header";
+  header.innerHTML = `
+    <span class="id-group-date">${label}</span>
+    <span class="id-group-count">${n} trade${n !== 1 ? "s" : ""}</span>
   `;
+  group.appendChild(header);
 
-  // Insert trade rows into table
-  const table = group.querySelector(".id-table");
-  trades.forEach(t => table.appendChild(_buildTradeRow(t)));
+  // Real <table> so we can use rowSpan for merged cells
+  const table = document.createElement("table");
+  table.className = "id-table";
 
-  // Merged summary row — spans full width after all trades
-  const summary = document.createElement("div");
-  summary.className = "id-day-summary";
-  summary.innerHTML = `
-    <div class="id-sum-cell">
-      <span class="id-sum-label">Day Gross</span>
-      <span class="id-sum-val ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
-    </div>
-    <div class="id-sum-sep">|</div>
-    <div class="id-sum-cell">
-      <span class="id-sum-label">Actual Received</span>
-      <input class="id-actual-input" type="number" data-date="${date}"
-        placeholder="Enter ₹ received" step="0.01"
-        value="${actual !== undefined ? actual : ""}" />
-    </div>
-    <div class="id-sum-sep">|</div>
-    <div class="id-sum-cell">
-      <span class="id-sum-label">Tax / Charges</span>
-      <span class="id-charges-val loss" data-date="${date}">${charges !== null ? _fmt(Math.abs(charges)) : "–"}</span>
-    </div>
-  `;
-  table.appendChild(summary);
+  const thead = document.createElement("thead");
+  thead.innerHTML = `<tr>
+    <th>Type</th><th>Symbol</th><th>Qty</th>
+    <th>Entry</th><th>Exit</th><th>P/L</th><th></th>
+    <th class="id-th-merge">Day Gross</th>
+    <th class="id-th-merge">Actual Received</th>
+    <th class="id-th-merge">Tax / Charges</th>
+  </tr>`;
+  table.appendChild(thead);
 
-  // Actual input binding
-  group.querySelector(".id-actual-input").addEventListener("change", async (e) => {
-    const val = parseFloat(e.target.value);
-    if (isNaN(val)) return;
-    await _saveDayActual(date, val);
-    const newCharges = grossSum - val;
-    const chargesEl  = group.querySelector(".id-charges-val");
-    if (chargesEl) chargesEl.textContent = _fmt(Math.abs(newCharges));
-    _renderSummary();
+  const tbody = document.createElement("tbody");
+
+  trades.forEach((t, i) => {
+    const isLong = t.direction === "long";
+    const pl     = t.grossPL || 0;
+    const plCls  = pl >= 0 ? "profit" : "loss";
+    const tr     = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td><span class="id-dir-badge ${isLong ? "long" : "short"}">${isLong ? "▲ L" : "▼ S"}</span></td>
+      <td class="id-symbol">${t.symbol}</td>
+      <td class="id-mono">${t.qty}</td>
+      <td class="id-mono">${_fmt(t.entryPrice)}</td>
+      <td class="id-mono">${_fmt(t.exitPrice)}</td>
+      <td class="id-mono ${plCls}">${pl >= 0 ? "+" : ""}${_fmt(pl)}</td>
+      <td class="id-row-actions">
+        <button class="id-edit-btn" data-id="${t.id}" title="Edit">✎</button>
+        <button class="id-del-btn"  data-id="${t.id}" title="Delete">✕</button>
+      </td>
+    `;
+    tr.querySelector(".id-edit-btn").addEventListener("click", () => _openEditModal(t.id));
+    tr.querySelector(".id-del-btn").addEventListener("click",  () => _deleteTrade(t.id));
+
+    // Merged cells — only on the first row, spanning all n rows
+    if (i === 0) {
+      // Day Gross
+      const tdGross = document.createElement("td");
+      tdGross.rowSpan   = n;
+      tdGross.className = "id-merged-cell";
+      tdGross.innerHTML = `<div class="id-mc-label">Day Gross</div><div class="id-mc-val ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</div>`;
+      tr.appendChild(tdGross);
+
+      // Actual Received
+      const tdActual = document.createElement("td");
+      tdActual.rowSpan   = n;
+      tdActual.className = "id-merged-cell";
+      const inp = document.createElement("input");
+      inp.className    = "id-actual-input";
+      inp.type         = "number";
+      inp.placeholder  = "Enter ₹ received";
+      inp.step         = "0.01";
+      inp.dataset.date = date;
+      if (actual !== undefined) inp.value = actual;
+      const inpWrap = document.createElement("div");
+      inpWrap.innerHTML = `<div class="id-mc-label">Actual Received</div>`;
+      inpWrap.appendChild(inp);
+      tdActual.appendChild(inpWrap);
+      tr.appendChild(tdActual);
+
+      // Tax
+      const tdTax = document.createElement("td");
+      tdTax.rowSpan   = n;
+      tdTax.className = "id-merged-cell";
+      tdTax.innerHTML = `<div class="id-mc-label">Tax / Charges</div><div class="id-charges-val loss">${charges !== null ? _fmt(Math.abs(charges)) : "–"}</div>`;
+      tr.appendChild(tdTax);
+
+      inp.addEventListener("change", (e) => {
+        const val    = parseFloat(e.target.value);
+        const prevEl = e.target;
+        if (isNaN(val)) return;
+        _showIdConfirm({
+          icon: "💰",
+          title: "Save Actual Received?",
+          msg: `${_fmt(val)} for ${label}`,
+          confirmLabel: "Save",
+          onOk: async () => {
+            await _saveDayActual(date, val);
+            const newCharges = grossSum - val;
+            const chargesEl  = group.querySelector(".id-charges-val");
+            if (chargesEl) chargesEl.textContent = _fmt(Math.abs(newCharges));
+            _renderSummary();
+          },
+          onCancel: () => { prevEl.value = actual !== undefined ? actual : ""; }
+        });
+      });
+    }
+
+    tbody.appendChild(tr);
   });
 
+  table.appendChild(tbody);
+  group.appendChild(table);
   return group;
-}
-
-function _buildTradeRow(t) {
-  const isLong = t.direction === "long";
-  const pl     = t.grossPL || 0;
-  const plCls  = pl >= 0 ? "profit" : "loss";
-
-  const row = document.createElement("div");
-  row.className = "id-row";
-  row.innerHTML = `
-    <span><span class="id-dir-badge ${isLong ? "long" : "short"}">${isLong ? "▲ L" : "▼ S"}</span></span>
-    <span class="id-symbol">${t.symbol}</span>
-    <span class="id-mono">${t.qty}</span>
-    <span class="id-mono">${_fmt(t.entryPrice)}</span>
-    <span class="id-mono">${_fmt(t.exitPrice)}</span>
-    <span class="id-mono ${plCls}">${pl >= 0 ? "+" : ""}${_fmt(pl)}</span>
-    <span class="id-row-actions">
-      <button class="id-edit-btn" data-id="${t.id}" title="Edit">✎</button>
-      <button class="id-del-btn"  data-id="${t.id}" title="Delete">✕</button>
-    </span>
-  `;
-  row.querySelector(".id-edit-btn").addEventListener("click", () => _openEditModal(t.id));
-  row.querySelector(".id-del-btn").addEventListener("click",  () => _deleteTrade(t.id));
-  return row;
 }
 
 // ── Summary Panel ─────────────────────────────────────────────────────────────
@@ -378,18 +409,24 @@ function _renderSummary() {
 
 // ── Capital Edit ──────────────────────────────────────────────────────────────
 function _editCapital() {
-  const current = _getCap();
+  const current  = _getCap();
   const fundName = _fund === "zerodha" ? "Zerodha" : "Groww";
-  const newVal = prompt(
-    `Intraday Capital — ${fundName}\nCurrent: ₹${current.toLocaleString("en-IN")}\n\nEnter new capital amount:`
-  );
-  if (newVal === null) return;
-  const parsed = parseFloat(newVal);
-  if (isNaN(parsed) || parsed < 0) { _toast("Invalid amount.", "error"); return; }
-  if (!confirm(`Set ${fundName} intraday capital to ₹${parsed.toLocaleString("en-IN")}?`)) return;
-  localStorage.setItem(_capKey(), parsed);
-  _renderSummary();
-  _toast("Capital updated.", "success");
+  _showIdConfirm({
+    icon: "✎",
+    title: `${fundName} Capital`,
+    msg: current > 0 ? `Current: ${_fmt(current)}` : "Set your starting capital",
+    confirmLabel: "Update",
+    showInput: true,
+    inputValue: current > 0 ? current : "",
+    inputPlaceholder: "Enter amount in ₹",
+    onOk: (val) => {
+      const parsed = parseFloat(val);
+      if (isNaN(parsed) || parsed < 0) { _toast("Invalid amount.", "error"); return; }
+      localStorage.setItem(_capKey(), parsed);
+      _renderSummary();
+      _toast("Capital updated.", "success");
+    }
+  });
 }
 
 // ── Withdrawal ────────────────────────────────────────────────────────────────
@@ -550,16 +587,25 @@ async function _saveTrade() {
   }
 }
 
-async function _deleteTrade(id) {
-  if (!confirm("Delete this trade? This cannot be undone.")) return;
-  try {
-    await deleteDoc(doc(db, INTRADAY_COL, id));
-    _trades = _trades.filter(t => t.id !== id);
-    _render();
-    _toast("Deleted.", "info");
-  } catch (e) {
-    _toast("Error: " + e.message, "error");
-  }
+function _deleteTrade(id) {
+  const t = _trades.find(t => t.id === id);
+  _showIdConfirm({
+    icon: "🗑",
+    title: "Delete Trade?",
+    msg: t ? `${t.symbol} · ${t.qty} qty · ${t.date}` : "This cannot be undone.",
+    confirmLabel: "Delete",
+    confirmClass: "btn-confirm-danger",
+    onOk: async () => {
+      try {
+        await deleteDoc(doc(db, INTRADAY_COL, id));
+        _trades = _trades.filter(t => t.id !== id);
+        _render();
+        _toast("Deleted.", "info");
+      } catch (e) {
+        _toast("Error: " + e.message, "error");
+      }
+    }
+  });
 }
 
 async function _saveDayActual(date, amount) {
@@ -571,6 +617,42 @@ async function _saveDayActual(date, amount) {
     console.error("Save day actual error:", e);
     _toast("Could not save.", "error");
   }
+}
+
+// ── Custom Confirm/Prompt Popup ───────────────────────────────────────────────
+function _showIdConfirm({ icon = "", title = "", msg = "", confirmLabel = "Confirm", confirmClass = "", showInput = false, inputValue = "", inputPlaceholder = "", onOk, onCancel } = {}) {
+  const modal = $("idConfirmModal");
+  if (!modal) return;
+
+  $("idConfirmIcon").textContent  = icon;
+  $("idConfirmTitle").textContent = title;
+  $("idConfirmMsg").textContent   = msg;
+
+  const okBtn = $("idConfirmOk");
+  okBtn.textContent = confirmLabel;
+  okBtn.className   = "btn-primary" + (confirmClass ? " " + confirmClass : "");
+
+  const inp = $("idConfirmInput");
+  if (showInput) {
+    inp.value       = inputValue;
+    inp.placeholder = inputPlaceholder;
+    inp.classList.remove("hidden");
+    setTimeout(() => { inp.focus(); inp.select(); }, 80);
+  } else {
+    inp.classList.add("hidden");
+  }
+
+  modal.classList.remove("hidden");
+
+  const close = () => modal.classList.add("hidden");
+
+  okBtn.onclick = () => {
+    close();
+    if (onOk) onOk(showInput ? inp.value : null);
+  };
+  $("idConfirmCancel").onclick = () => { close(); if (onCancel) onCancel(); };
+  modal.onclick = (e) => { if (e.target === modal) { close(); if (onCancel) onCancel(); } };
+  if (showInput) inp.onkeydown = (e) => { if (e.key === "Enter") okBtn.click(); };
 }
 
 // ── Event Binding (once) ──────────────────────────────────────────────────────
