@@ -50,7 +50,7 @@ async function _loadAll() {
       if (b.date !== a.date) return b.date.localeCompare(a.date);
       const ca = a.createdAt?.toMillis?.() ?? 0;
       const cb = b.createdAt?.toMillis?.() ?? 0;
-      return ca - cb;
+      return cb - ca;
     });
   } catch (e) {
     console.error("Intraday trades load error:", e);
@@ -122,32 +122,27 @@ function _buildDateGroup(date, trades) {
 
   group.innerHTML = `
     <div class="id-group-header">
-      <span class="id-group-date">${label}</span>
-      <span class="id-group-count">${trades.length} trade${trades.length !== 1 ? "s" : ""}</span>
-      <span class="id-group-gross ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
+      <div class="id-header-left">
+        <span class="id-group-date">${label}</span>
+        <span class="id-group-count">${trades.length} trade${trades.length !== 1 ? "s" : ""}</span>
+      </div>
+      <div class="id-header-right">
+        <span class="id-hdr-label">Gross</span>
+        <span class="id-group-gross ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
+        <span class="id-hdr-sep">|</span>
+        <span class="id-hdr-label">Actual</span>
+        <input class="id-actual-input" type="number" data-date="${date}"
+          placeholder="₹ received" step="0.01"
+          value="${actual !== undefined ? actual : ""}" />
+        <span class="id-hdr-sep">|</span>
+        <span class="id-hdr-label">Tax</span>
+        <span class="id-charges-val loss" data-date="${date}">${charges !== null ? _fmt(Math.abs(charges)) : "–"}</span>
+      </div>
     </div>
     <div class="id-table">
       <div class="id-thead">
         <span>Type</span><span>Symbol</span><span>Qty</span>
         <span>Entry</span><span>Exit</span><span>P/L</span><span></span>
-      </div>
-    </div>
-    <div class="id-group-footer">
-      <div class="id-footer-cell">
-        <span class="id-footer-label">Day Gross</span>
-        <span class="id-footer-val ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
-      </div>
-      <div class="id-footer-cell">
-        <span class="id-footer-label">Actual Received</span>
-        <input class="id-actual-input" type="number" data-date="${date}"
-          placeholder="Enter ₹ received" step="0.01"
-          value="${actual !== undefined ? actual : ""}" />
-      </div>
-      <div class="id-footer-cell">
-        <span class="id-footer-label">Charges / Tax</span>
-        <span class="id-charges-val loss" data-date="${date}">
-          ${charges !== null ? _fmt(Math.abs(charges)) : "–"}
-        </span>
       </div>
     </div>
   `;
@@ -161,7 +156,6 @@ function _buildDateGroup(date, trades) {
     const val = parseFloat(e.target.value);
     if (isNaN(val)) return;
     await _saveDayActual(date, val);
-    // Update charges cell inline
     const newCharges = grossSum - val;
     const chargesEl  = group.querySelector(".id-charges-val");
     if (chargesEl) chargesEl.textContent = _fmt(Math.abs(newCharges));
@@ -523,7 +517,7 @@ async function _saveTrade() {
         if (b.date !== a.date) return b.date.localeCompare(a.date);
         const ca = a.createdAt?.toMillis?.() ?? 0;
         const cb = b.createdAt?.toMillis?.() ?? 0;
-        return ca - cb;
+        return cb - ca;
       });
     } else {
       const data = { fund: _fund, date, symbol, qty, direction, entryPrice, exitPrice, grossPL, createdAt: serverTimestamp() };
@@ -534,7 +528,7 @@ async function _saveTrade() {
         if (b.date !== a.date) return b.date.localeCompare(a.date);
         const ca = a.createdAt?.toMillis?.() ?? 0;
         const cb = b.createdAt?.toMillis?.() ?? 0;
-        return ca - cb;
+        return cb - ca;
       });
     }
     _closeModal();
