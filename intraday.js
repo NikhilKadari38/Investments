@@ -250,7 +250,9 @@ function _renderSummary() {
   });
 
   // Charges only from days where actual was entered
-  const daysWithActual = Object.entries(_dayActuals);
+  // Only count day actuals for dates that still have trades
+  const tradeDates     = new Set(_trades.map(t => t.date));
+  const daysWithActual = Object.entries(_dayActuals).filter(([date]) => tradeDates.has(date));
   const totalActualEntered = daysWithActual.reduce((s, [, v]) => s + v, 0);
   const grossForActualDays = daysWithActual.reduce((s, [date]) => {
     return s + _trades.filter(t => t.date === date).reduce((ss, t) => ss + (t.grossPL || 0), 0);
