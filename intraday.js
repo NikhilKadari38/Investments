@@ -122,22 +122,8 @@ function _buildDateGroup(date, trades) {
 
   group.innerHTML = `
     <div class="id-group-header">
-      <div class="id-header-left">
-        <span class="id-group-date">${label}</span>
-        <span class="id-group-count">${trades.length} trade${trades.length !== 1 ? "s" : ""}</span>
-      </div>
-      <div class="id-header-right">
-        <span class="id-hdr-label">Gross</span>
-        <span class="id-group-gross ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
-        <span class="id-hdr-sep">|</span>
-        <span class="id-hdr-label">Actual</span>
-        <input class="id-actual-input" type="number" data-date="${date}"
-          placeholder="₹ received" step="0.01"
-          value="${actual !== undefined ? actual : ""}" />
-        <span class="id-hdr-sep">|</span>
-        <span class="id-hdr-label">Tax</span>
-        <span class="id-charges-val loss" data-date="${date}">${charges !== null ? _fmt(Math.abs(charges)) : "–"}</span>
-      </div>
+      <span class="id-group-date">${label}</span>
+      <span class="id-group-count">${trades.length} trade${trades.length !== 1 ? "s" : ""}</span>
     </div>
     <div class="id-table">
       <div class="id-thead">
@@ -150,6 +136,29 @@ function _buildDateGroup(date, trades) {
   // Insert trade rows into table
   const table = group.querySelector(".id-table");
   trades.forEach(t => table.appendChild(_buildTradeRow(t)));
+
+  // Merged summary row — spans full width after all trades
+  const summary = document.createElement("div");
+  summary.className = "id-day-summary";
+  summary.innerHTML = `
+    <div class="id-sum-cell">
+      <span class="id-sum-label">Day Gross</span>
+      <span class="id-sum-val ${grossCls}">${grossSum >= 0 ? "+" : ""}${_fmt(grossSum)}</span>
+    </div>
+    <div class="id-sum-sep">|</div>
+    <div class="id-sum-cell">
+      <span class="id-sum-label">Actual Received</span>
+      <input class="id-actual-input" type="number" data-date="${date}"
+        placeholder="Enter ₹ received" step="0.01"
+        value="${actual !== undefined ? actual : ""}" />
+    </div>
+    <div class="id-sum-sep">|</div>
+    <div class="id-sum-cell">
+      <span class="id-sum-label">Tax / Charges</span>
+      <span class="id-charges-val loss" data-date="${date}">${charges !== null ? _fmt(Math.abs(charges)) : "–"}</span>
+    </div>
+  `;
+  table.appendChild(summary);
 
   // Actual input binding
   group.querySelector(".id-actual-input").addEventListener("change", async (e) => {

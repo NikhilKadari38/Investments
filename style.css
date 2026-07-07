@@ -1806,24 +1806,10 @@ a { color: var(--accent); text-decoration: none; }
 .id-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   padding: 10px 16px;
   background: var(--surface-3);
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.id-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.id-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .id-group-date {
@@ -1831,6 +1817,7 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 13px;
   font-weight: 600;
   color: var(--text-1);
+  flex: 1;
 }
 
 .id-group-count {
@@ -1839,13 +1826,25 @@ a { color: var(--accent); text-decoration: none; }
   font-family: var(--ff-mono);
 }
 
-.id-group-gross {
-  font-family: var(--ff-mono);
-  font-size: 13px;
-  font-weight: 600;
+/* Merged summary row — spans full width below all trade rows */
+.id-day-summary {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-top: 1.5px solid var(--border-2);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.id-hdr-label {
+.id-sum-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.id-sum-label {
   font-size: 10px;
   font-family: var(--ff-ui);
   font-weight: 500;
@@ -1854,16 +1853,22 @@ a { color: var(--accent); text-decoration: none; }
   letter-spacing: 0.05em;
 }
 
-.id-hdr-sep {
+.id-sum-val {
+  font-family: var(--ff-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.id-sum-sep {
   color: var(--border-2);
-  font-size: 13px;
-  margin: 0 2px;
+  font-size: 16px;
+  padding: 0 4px;
 }
 
 .id-charges-val {
   font-family: var(--ff-mono);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 /* Trade table inside group */
@@ -1948,16 +1953,16 @@ a { color: var(--accent); text-decoration: none; }
 .id-del-btn:hover  { color: var(--loss);   background: rgba(224,80,80,.10); }
 
 
-/* Actual input field — compact inline in group header */
+/* Actual input field — in merged summary row */
 .id-actual-input {
   background: var(--surface-2);
   border: 1px solid var(--border-2);
   border-radius: 6px;
   color: var(--text-1);
   font-family: var(--ff-mono);
-  font-size: 12px;
-  padding: 4px 8px;
-  width: 110px;
+  font-size: 13px;
+  padding: 5px 10px;
+  width: 140px;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -2129,9 +2134,8 @@ a { color: var(--accent); text-decoration: none; }
     padding: 7px 10px;
     font-size: 11px;
   }
-  .id-group-header { gap: 8px; }
-  .id-header-right { flex-wrap: wrap; gap: 6px; }
-  .id-actual-input { width: 88px; }
+  .id-day-summary { gap: 8px; }
+  .id-actual-input { width: 110px; }
   .id-metrics-grid { grid-template-columns: 1fr 1fr; }
 }
 
