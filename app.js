@@ -444,7 +444,13 @@ function _renderTable() {
 
   if (filtered.length === 0) return;
 
-  // Sort by buyDate
+  // Assign fixed serial numbers based on oldest-first order
+  const serialMap = {};
+  [...filtered].sort((a, b) => (a.buyDate || "").localeCompare(b.buyDate || "")).forEach((t, i) => {
+    serialMap[t.id] = i + 1;
+  });
+
+  // Sort display order
   filtered.sort((a, b) => {
     const da = a.buyDate || "", db = b.buyDate || "";
     return _tradeSort === "newest" ? db.localeCompare(da) : da.localeCompare(db);
@@ -494,7 +500,7 @@ function _renderTable() {
       : '<span class="dash-val">–</span>';
 
     tr.innerHTML =
-      '<td class="td-num">'    + (i + 1) + '</td>' +
+      '<td class="td-num">'    + serialMap[trade.id] + '</td>' +
       '<td class="td-symbol">' +
         '<span class="sym-badge">' + trade.symbol + '</span>' +
         (trade.exchange ? '<span class="exch-tag">' + trade.exchange + '</span>' : '') +
