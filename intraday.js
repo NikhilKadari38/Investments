@@ -8,12 +8,14 @@ import {
 
 const INTRADAY_COL      = "nktt_intraday";
 const INTRADAY_DAYS_COL = "nktt_intraday_days";
+const WORKER_URL        = "https://nk-price-proxy.lotuswhite9392.workers.dev";
 
 let _fund        = "zerodha";
 let _trades      = [];     // [{id, fund, date, symbol, qty, direction, entryPrice, exitPrice, grossPL}]
 let _dayActuals  = {};     // { "2026-07-07": 4735 }
 let _editingId   = null;
 let _initialized = false;
+let _fundsAdvice = {};     // cache: "fund_bucket" → advice string
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $        = (id) => document.getElementById(id);
@@ -402,11 +404,38 @@ function _renderSummary() {
       `).join("")}
     </div>
     ` : ""}
+
+    ${capital > 0 ? _buildFundsCard({
+      capital, totalEffective, totalWithdrawn,
+      winRate, avgDaily, totalDays, winDays, lossDays, bestDay, worstDay
+    }) : ""}
   `;
 
   aside.querySelector(".id-edit-cap")?.addEventListener("click", _editCapital);
   const wOval = $("withdrawableOval");
   if (wOval && withdrawable > 0) wOval.addEventListener("click", () => _showWithdrawModal(withdrawable));
+
+  // Funds card AI wiring
+  if (capital > 0) {
+    const netProfit = totalEffective - totalWithdrawn;
+    const aiBtn = $("idFundsAiBtn");
+    if (aiBtn) aiBtn.addEventListener("click", () => _fetchFundsAdvice({
+      capital, totalEffective, totalWithdrawn, netProfit,
+      winRate, avgDaily, totalDays, winDays, lossDays, bestDay, worstDay
+    }));
+    // Auto-fetch for deficit if not cached
+    if (netProfit < -50) {
+      const cacheKey = _fund + "_" + Math.round(netProfit / 200);
+      if (_fundsAdvice[cacheKey]) {
+        _showFundsAdvice(_fundsAdvice[cacheKey]);
+      } else {
+        _fetchFundsAdvice({
+          capital, totalEffective, totalWithdrawn, netProfit,
+          winRate, avgDaily, totalDays, winDays, lossDays, bestDay, worstDay
+        });
+      }
+    }
+  }
 }
 
 // ── Capital Edit ──────────────────────────────────────────────────────────────
@@ -429,6 +458,93 @@ function _editCapital() {
       _toast("Capital updated.", "success");
     }
   });
+}
+
+// ── Funds Reminder ────────────────────────────────────────────────────────────
+function _buildFundsCard({ capital, totalEffective, totalWithdrawn, winRate, avgDaily, totalDays, bestDay, worstDay }) {
+  const net    = totalEffective - totalWithdrawn;
+  const pct    = capital > 0 ? ((net / capital) * 100) : 0;
+  const status = net > 50 ? "surplus" : net < -50 ? "deficit" : "neutral";
+
+  const icon  = status === "surplus" ? "💰" : status === "deficit" ? "⚠️" : "⚖️";
+  const badge = status === "surplus" ? "Surplus" : status === "deficit" ? "Deficit" : "Breakeven";
+
+  let body = "";
+  if (status === "surplus") {
+    body = `
+      <div class="id-funds-amount profit">+${_fmt(net)}</div>
+      <div class="id-funds-sub">above your ₹${(capital / 1000).toFixed(0)}k capital (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)</div>
+      <div class="id-funds-action">
+        Transfer <strong>${_fmt(net)}</strong> to savings — your capital is safe and working.
+      </div>`;
+  } else if (status === "deficit") {
+    body = `
+      <div class="id-funds-amount loss">${_fmt(net)}</div>
+      <div class="id-funds-sub">below your ₹${(capital / 1000).toFixed(0)}k capital (${pct.toFixed(1)}%)</div>
+      <div class="id-funds-suggestion" id="idFundsSuggestion">
+        <div class="id-funds-loading">
+          <span class="id-funds-dot"></span><span class="id-funds-dot"></span><span class="id-funds-dot"></span>
+        </div>
+      </div>
+      <button class="id-funds-ai-btn" id="idFundsAiBtn" style="display:none">🤖 Ask Again</button>`;
+  } else {
+    body = `
+      <div class="id-funds-amount" style="color:var(--text-2)">₹0</div>
+      <div class="id-funds-sub">at breakeven — withdrawn profits match gains</div>
+      <div class="id-funds-action">Keep trading carefully. Protect your capital.</div>`;
+  }
+
+  return `
+    <div class="sum-graph-sep"></div>
+    <div class="id-funds-card id-funds-${status}">
+      <div class="id-funds-header">
+        <span class="id-funds-icon">${icon}</span>
+        <span class="id-funds-title">Funds Status</span>
+        <span class="id-funds-badge id-funds-badge-${status}">${badge}</span>
+      </div>
+      ${body}
+    </div>`;
+}
+
+function _showFundsAdvice(text) {
+  const el = $("idFundsSuggestion");
+  if (el) el.innerHTML = text;
+  const btn = $("idFundsAiBtn");
+  if (btn) btn.style.display = "";
+}
+
+async function _fetchFundsAdvice({ capital, netProfit, winRate, avgDaily, totalDays, winDays, lossDays, bestDay, worstDay }) {
+  const cacheKey = _fund + "_" + Math.round(netProfit / 200);
+  if (_fundsAdvice[cacheKey]) { _showFundsAdvice(_fundsAdvice[cacheKey]); return; }
+
+  const ctx = [
+    `Capital: ₹${capital.toFixed(0)}`,
+    `Net P&L after withdrawals: ₹${netProfit.toFixed(0)}`,
+    `Win rate: ${winRate !== null ? winRate.toFixed(0) + "%" : "N/A"}`,
+    `Win days: ${winDays}, Loss days: ${lossDays}, Total days: ${totalDays}`,
+    `Avg per day: ${avgDaily !== null ? "₹" + avgDaily.toFixed(0) : "N/A"}`,
+    `Best day: ${bestDay !== null ? "₹" + bestDay.toFixed(0) : "N/A"}`,
+    `Worst day: ${worstDay !== null ? "₹" + worstDay.toFixed(0) : "N/A"}`,
+    `Platform: ${_fund}`,
+  ].join(" | ");
+
+  const prompt = `You are a practical intraday trading advisor. A trader's account is ₹${Math.abs(netProfit).toFixed(0)} below starting capital. Stats: ${ctx}. Give 2-3 short, specific, actionable suggestions to recover the deficit and protect capital. No generic advice. Use emojis. Max 60 words. Format as short bullet points.`;
+
+  try {
+    const res  = await fetch(WORKER_URL + "?type=ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    const advice = data.analysis || data.result || "Couldn't load advice. Tap Ask Again.";
+    _fundsAdvice[cacheKey] = advice;
+    _showFundsAdvice(advice);
+  } catch {
+    _showFundsAdvice("⚠️ Network error. Tap Ask Again.");
+    const btn = $("idFundsAiBtn");
+    if (btn) btn.style.display = "";
+  }
 }
 
 // ── Withdrawal ────────────────────────────────────────────────────────────────

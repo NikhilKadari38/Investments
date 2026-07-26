@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>NK Trade Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.svg" />
@@ -114,7 +114,7 @@
           <table class="trade-table" id="tradeTable">
             <thead>
               <tr>
-                <th>#</th>
+                <th><button id="sortToggleBtn" class="sort-toggle-btn" title="Sort order">▼</button></th>
                 <th>Symbol</th>
                 <th>Shares</th>
                 <th>Buy Price</th>
@@ -457,6 +457,22 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Mobile Bottom Nav ─────────────────────────────────────────────────── -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <a class="nav-link mob-nav-link" data-page="portfolio">
+      <span class="mob-nav-icon">📈</span>
+      <span>Swing</span>
+    </a>
+    <a class="nav-link mob-nav-link" data-page="intraday">
+      <span class="mob-nav-icon">⚡</span>
+      <span>Intraday</span>
+    </a>
+    <a class="nav-link mob-nav-link" data-page="research">
+      <span class="mob-nav-icon">🔍</span>
+      <span>Research</span>
+    </a>
+  </nav>
 
   <!-- ── Mobile FAB ──────────────────────────────────────────────────────── -->
   <button class="fab-add hidden" id="fabAdd">+ Add Trade</button>

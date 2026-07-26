@@ -12,6 +12,7 @@ import { initIntraday } from "./intraday.js";
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
 let currentFilter   = "all";
+let _tradeSort      = "newest"; // "newest" | "oldest"
 let activeSellId    = null;
 let priceInterval   = null;
 let currentFund     = localStorage.getItem("portfolioFund")  || "zerodha";
@@ -100,7 +101,7 @@ function _getCurrentPage() {
 function _navigateTo(page) {
   if (page === "research")  { location.hash = "Research";  return; }
   if (page === "intraday")  { location.hash = "Intraday";  return; }
-  location.hash = "Portfolio";
+  location.hash = "Swing";
 }
 
 function _showPage(page) {
@@ -111,7 +112,7 @@ function _showPage(page) {
   if (portfolio) portfolio.classList.toggle("hidden", page !== "portfolio");
   if (intraday)  intraday.classList.toggle("hidden",  page !== "intraday");
   if (research)  research.classList.toggle("hidden",  page !== "research");
-  if (fab)       fab.classList.toggle("hidden", page !== "portfolio");
+  if (fab && window.innerWidth <= 768) fab.classList.toggle("hidden", page === "research");
   document.querySelectorAll(".nav-link").forEach((l) => {
     l.classList.toggle("active", l.dataset.page === page);
   });
@@ -346,7 +347,7 @@ function _initMobile() {
   if (!fab) return;
 
   function checkMobile() {
-    if (window.innerWidth <= 768) {
+    if (window.innerWidth <= 768 && _getCurrentPage() !== "research") {
       fab.classList.remove("hidden");
     } else {
       fab.classList.add("hidden");
@@ -356,9 +357,14 @@ function _initMobile() {
   window.addEventListener("resize", checkMobile);
 
   fab.addEventListener("click", () => {
-    $("addTradeModal").classList.remove("hidden");
-    $("inputBuyDate").valueAsDate = new Date();
-    $("inputSymbol").focus();
+    const page = _getCurrentPage();
+    if (page === "intraday") {
+      $("intradayAddBtn")?.click();
+    } else {
+      $("addTradeModal").classList.remove("hidden");
+      $("inputBuyDate").valueAsDate = new Date();
+      $("inputSymbol").focus();
+    }
   });
 }
 
@@ -402,6 +408,13 @@ document.querySelectorAll(".filter-tab").forEach((tab) => {
   });
 });
 
+document.addEventListener("click", (e) => {
+  if (e.target.id === "sortToggleBtn") {
+    _tradeSort = _tradeSort === "newest" ? "oldest" : "newest";
+    _renderTable();
+  }
+});
+
 function _moveFilterThumb(activeTab) {
   const thumb     = document.querySelector(".filter-thumb");
   const container = document.querySelector(".filter-tabs");
@@ -424,7 +437,18 @@ function _renderTable() {
   const tbody = $("tradeTableBody");
   tbody.innerHTML = "";
   $("emptyState").style.display = filtered.length === 0 ? "flex" : "none";
+
+  // Update sort button icon
+  const sortBtn = $("sortToggleBtn");
+  if (sortBtn) sortBtn.textContent = _tradeSort === "newest" ? "▼" : "▲";
+
   if (filtered.length === 0) return;
+
+  // Sort by buyDate
+  filtered.sort((a, b) => {
+    const da = a.buyDate || "", db = b.buyDate || "";
+    return _tradeSort === "newest" ? db.localeCompare(da) : da.localeCompare(db);
+  });
 
   filtered.forEach((trade, i) => {
     const tr       = document.createElement("tr");

@@ -352,6 +352,19 @@ a { color: var(--accent); text-decoration: none; }
 .trade-table td:nth-child(2) { position: sticky; left: 42px; background: var(--bg); z-index: 2; text-align: left; }
 
 .td-num    { color: var(--text-3); font-family: var(--ff-mono); font-size: 11px; text-align: center !important; width: 42px; }
+
+.sort-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color var(--tx), background var(--tx);
+  line-height: 1;
+}
+.sort-toggle-btn:hover { color: var(--accent); background: var(--accent-dim); }
 .td-mono   { font-family: var(--ff-mono); font-size: 12px; }
 .td-date   { font-family: var(--ff-mono); font-size: 11px; color: var(--text-2); }
 .td-symbol { min-width: 120px; }
@@ -532,121 +545,141 @@ a { color: var(--accent); text-decoration: none; }
 
 @media (max-width: 768px) {
 
-  /* ── Header ── */
-  .header { padding: 0 14px; gap: 8px; height: 56px; }
-  .logo-sub { display: none; }
-  .logo-text { font-size: 13px; }
-  .logo-icon { width: 36px; height: 36px; }
-  .logo-icon svg { width: 20px; height: 20px; }
-  .ai-header-btn { font-size: 9px; padding: 3px 8px; }
-  .nav { display: none; }
-  .market-status { display: none; }
-  .btn-logout { font-size: 10px; padding: 4px 10px; }
+  /* ─── Global mobile base ─────────────────────────────────────────────────── */
+  html { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+  body { overflow-x: hidden; width: 100vw; }
 
-  /* ── App shell — allow vertical scroll on mobile ── */
-  .app { height: auto; min-height: 100vh; overflow: visible; }
-  .main-content { flex-direction: column; overflow: visible; height: auto; }
-
-  /* ── Summary panel — stacked full width, shows first ── */
-  .section-right {
-    width: 100%; border-left: none; order: -1;
-    border-bottom: 1px solid var(--border);
-    padding: 16px 14px 14px; gap: 10px; overflow: visible;
+  /* ─── App shell: fixed header + scrollable body + fixed bottom nav ───────── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;       /* dynamic viewport — accounts for mobile browser chrome */
+    overflow: hidden;
+    width: 100%;
   }
-  /* Hero card: full width on mobile */
-  .sum-hero { padding: 16px 16px; border-radius: var(--r); }
-  .sum-hero-val { font-size: 22px; }
-  /* Stat pair: two columns still fine on mobile */
-  .sum-stat-pair { gap: 8px; }
-  .sum-stat-card { padding: 12px 12px; }
-  .sum-stat-val  { font-size: 16px; }
-  .sum-stat-label { font-size: 8px; }
-  .cur-val-pct { font-size: 10px; padding: 2px 6px; }
-  /* P/L cards: compact */
-  .sum-pl-oval { padding: 11px 14px; }
-  .sum-pl-val  { font-size: 16px; }
-  /* Hide graph on mobile to keep it clean */
+
+  /* ─── Header ─────────────────────────────────────────────────────────────── */
+  .header {
+    height: 56px;
+    padding: 0 16px;
+    gap: 10px;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  .logo-sub    { display: none; }
+  .logo-text   { font-size: 14px; }
+  .logo-icon   { width: 34px; height: 34px; }
+  .logo-icon svg { width: 20px; height: 20px; }
+  .nav         { display: none; }
+  .market-status { display: none; }
+  .header-right { gap: 8px; }
+  .ai-header-btn { font-size: 11px; padding: 6px 12px; border-radius: 20px; }
+  .btn-theme   { font-size: 14px; padding: 6px 8px; min-width: 36px; }
+  .btn-logout  { font-size: 11px; padding: 6px 12px; }
+
+  /* ─── Scrollable content area ────────────────────────────────────────────── */
+  .main-content {
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    height: 0; /* forces flex child to scroll inside flex container */
+    width: 100%;
+    /* push last content above fixed bottom nav */
+    padding-bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ─── Summary panel ──────────────────────────────────────────────────────── */
+  .section-right {
+    width: 100%;
+    border-left: none;
+    order: -1;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 16px 12px;
+    gap: 10px;
+    overflow: visible;
+    flex-shrink: 0;
+  }
+  .sum-hero          { padding: 14px 16px; border-radius: 14px; }
+  .sum-hero-val      { font-size: 22px; }
+  .sum-stat-pair     { gap: 8px; }
+  .sum-stat-card     { padding: 12px; }
+  .sum-stat-val      { font-size: 15px; }
+  .sum-stat-label    { font-size: 9px; }
+  .cur-val-pct       { font-size: 10px; padding: 2px 6px; }
+  .sum-pl-oval       { padding: 10px 14px; }
+  .sum-pl-val        { font-size: 15px; }
+  .sum-free-card     { padding: 12px 14px; }
+  .sum-free-val      { font-size: 17px; }
   .sum-graph-sep, .sum-graph-section { display: none; }
 
-  /* ── Left section ── */
+  /* ─── Trades section ─────────────────────────────────────────────────────── */
   .section-left {
     border-right: none;
-    padding: 14px 12px 80px;
+    padding: 14px 14px 20px;
     overflow: visible;
-    flex: none;
+    flex-shrink: 0;
+    width: 100%;
   }
-  .section-header { flex-wrap: wrap; gap: 10px; }
-  .section-title { font-size: 22px; }
-  .btn-add { display: none; } /* replaced by FAB */
+  .section-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+  }
+  .section-title-group { gap: 8px; flex-wrap: wrap; }
+  .section-title       { font-size: 22px; }
+  .ticker-tape         { display: none; } /* hides ticker on mobile — causes overflow */
+  .btn-add             { display: none; }
+  .table-wrapper       { display: none; }
 
-  /* ── Table → hide, show card list instead ── */
-  .table-wrapper { display: none; }
-
-  /* ── Trade Cards (mobile only) ── */
+  /* ─── Trade cards ────────────────────────────────────────────────────────── */
   .trade-cards { display: flex; flex-direction: column; gap: 10px; }
   .trade-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--r);
+    border-radius: 14px;
     padding: 14px;
-    position: relative;
+    width: 100%;
   }
-  .trade-card.card-open-up    { border-left: 3px solid var(--profit); }
-  .trade-card.card-open-down  { border-left: 3px solid var(--loss); }
+  .trade-card.card-open-up       { border-left: 3px solid var(--profit); }
+  .trade-card.card-open-down     { border-left: 3px solid var(--loss); }
   .trade-card.card-closed-profit { border-left: 3px solid var(--profit); background: var(--profit-bg); }
   .trade-card.card-closed-loss   { border-left: 3px solid var(--loss);   background: var(--loss-bg); }
 
-  .tc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .tc-top    { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .tc-symbol { display: flex; align-items: center; gap: 8px; }
   .tc-actions { display: flex; align-items: center; gap: 6px; }
-
-  .tc-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 12px;
-  }
-  .tc-field { display: flex; flex-direction: column; gap: 2px; }
-  .tc-label {
-    font-family: var(--ff-head);
-    font-size: 8px; font-weight: 600;
-    letter-spacing: .5px; text-transform: uppercase;
-    color: var(--text-2);
-  }
-  .tc-val {
-    font-family: var(--ff-mono);
-    font-size: 12px; color: var(--text-1);
-  }
+  .tc-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .tc-field  { display: flex; flex-direction: column; gap: 2px; }
+  .tc-label  { font-family: var(--ff-head); font-size: 8px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); }
+  .tc-val    { font-family: var(--ff-mono); font-size: 13px; color: var(--text-1); }
   .tc-val.profit { color: var(--profit); }
   .tc-val.loss   { color: var(--loss); }
   .tc-val.live   { color: var(--live); }
 
-  /* sell button full width on card */
   .tc-sell-btn {
     width: 100%; margin-top: 12px;
     background: transparent; border: 1px solid var(--profit);
-    color: var(--profit); font-size: 11px;
+    color: var(--profit); font-size: 12px;
     font-family: var(--ff-head); font-weight: 700;
-    padding: 8px; border-radius: var(--r-sm);
-    cursor: pointer; transition: all var(--tx);
-    letter-spacing: .5px;
+    padding: 10px; border-radius: 10px;
+    cursor: pointer; transition: all var(--tx); letter-spacing: .5px;
   }
   .tc-sell-btn:active { background: var(--profit); color: #000; }
 
-  /* Totals summary card (mobile) */
   .totals-card {
     background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 16px; margin-top: 4px;
+    border-radius: 12px; padding: 14px 16px; margin-top: 4px; width: 100%;
   }
-  .tc-totals-title {
-    font-family: var(--ff-head); font-size: 9px; font-weight: 700;
-    letter-spacing: 1.2px; text-transform: uppercase;
-    color: var(--accent); margin-bottom: 10px;
-  }
-  .tc-totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .tc-totals-title { font-family: var(--ff-head); font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .tc-totals-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
 
-  /* ── Floating Add Trade button ── */
+  /* ─── FAB (+ Add Trade) ──────────────────────────────────────────────────── */
   .fab-add {
-    position: fixed; bottom: 20px; left: 50%;
+    position: fixed;
+    bottom: calc(65px + env(safe-area-inset-bottom, 0px) + 12px);
+    left: 50%;
     transform: translateX(-50%);
     background: var(--accent); color: var(--text-inv);
     border: none; border-radius: 28px;
@@ -654,38 +687,101 @@ a { color: var(--accent); text-decoration: none; }
     font-size: 13px; letter-spacing: .5px;
     padding: 13px 32px;
     box-shadow: 0 4px 20px var(--accent-glow);
-    cursor: pointer; z-index: 400;
-    transition: opacity var(--tx), transform var(--tx);
+    cursor: pointer; z-index: 300;
     white-space: nowrap;
+    transition: opacity var(--tx), transform var(--tx);
   }
   .fab-add:active { opacity: .84; transform: translateX(-50%) scale(.97); }
 
-  /* ── Modals — full screen slide up ── */
+  /* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    width: 100vw;
+    z-index: 400;
+    background: var(--surface);
+    border-top: 1px solid var(--border-2);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    flex-shrink: 0;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .mob-nav-link {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 4px 8px;
+    font-family: var(--ff-ui);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+    background: none;
+    border-radius: 0;
+    cursor: pointer;
+    transition: color 0.15s;
+    min-height: 56px;
+  }
+  .mob-nav-link.active { color: var(--accent); }
+  .mob-nav-icon { font-size: 20px; line-height: 1; }
+
+  /* ─── Modals — slide up from bottom ─────────────────────────────────────── */
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal, .modal.modal-sm {
-    width: 100%;
-    border-radius: var(--r) var(--r) 0 0;
-    max-height: 92vh;
+    width: 100%; max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 92dvh;
     overflow-y: auto;
     animation: slideUpMobile .22s ease;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   @keyframes slideUpMobile {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
   }
-  .form-row { flex-direction: column; gap: 10px; }
-  .modal-body { padding: 16px; }
-  .modal-footer { padding: 14px 16px; }
+  .form-row      { flex-direction: column; gap: 10px; }
+  .modal-body    { padding: 20px 16px 12px; }
+  .modal-footer  { padding: 12px 16px; gap: 10px; }
+  .modal-footer .btn-cancel,
+  .modal-footer .btn-primary { flex: 1; padding: 12px; font-size: 14px; border-radius: 12px; }
 
-  /* ── Toast ── */
-  .toast-wrap { bottom: 90px; right: 14px; left: 14px; }
+  /* ─── Toast ──────────────────────────────────────────────────────────────── */
+  .toast-wrap { bottom: calc(65px + env(safe-area-inset-bottom, 0px) + 8px); right: 14px; left: 14px; }
   .toast { white-space: normal; text-align: center; }
 
-  /* ── Filter tabs ── */
-  .filter-tab { font-size: 10px; padding: 4px 10px; }
+  /* ─── Filter tabs ────────────────────────────────────────────────────────── */
+  .filter-tab { font-size: 11px; padding: 5px 12px; }
 
-  /* ── Login ── */
-  .login-box { width: calc(100vw - 40px); padding: 32px 24px; }
+  /* ─── Intraday page ──────────────────────────────────────────────────────── */
+  #intradaySummary {
+    width: 100%; border-left: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 16px 12px;
+  }
+  .id-metrics-grid { grid-template-columns: 1fr 1fr; }
+  .id-table { font-size: 11px; }
+  .id-table th, .id-table td { padding: 7px 6px; }
+  .id-merged-cell { padding: 10px 8px !important; }
+  .id-actual-input { width: 90px; font-size: 11px; }
+  .id-mc-val, .id-charges-val { font-size: 12px; }
+  .intraday-log { padding: 12px 14px 20px; }
+
+  /* ─── Research page ──────────────────────────────────────────────────────── */
+  .research-page {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 0;
+    padding: 16px 14px calc(65px + env(safe-area-inset-bottom, 0px) + 16px);
+    width: 100%;
+  }
+
+  /* ─── Login ──────────────────────────────────────────────────────────────── */
+  .login-overlay { align-items: center; padding: 20px; }
+  .login-box { width: 100%; max-width: 360px; padding: 28px 22px; }
 }
 
 /* ── Desktop: hide card view, show table ── */
@@ -1758,7 +1854,7 @@ a { color: var(--accent); text-decoration: none; }
 
 /* ── Research mobile ── */
 @media (max-width: 768px) {
-  .research-page { padding: 16px 14px 40px; }
+  /* research-page padding set in main mobile block above */
   .res-search { flex-direction: column; max-width: 100%; }
   .res-btn { width: 100%; }
   .res-grid-dash { grid-template-columns: 1fr; }
@@ -1784,6 +1880,9 @@ a { color: var(--accent); text-decoration: none; }
   .ai-dialogue { width: calc(100vw - 28px); right: 14px !important; top: 76px; }
   .platform-picker { margin-left: 8px; }
 }
+
+/* ── Mobile Bottom Nav (desktop: hidden; mobile rules live in @media block above) ── */
+.mobile-bottom-nav { display: none; }
 
 /* ── INTRADAY MODULE ─────────────────────────────────────────────────────────── */
 
@@ -2054,6 +2153,121 @@ a { color: var(--accent); text-decoration: none; }
 .id-withdraw-date { color: var(--text-3); font-family: var(--ff-mono); flex-shrink: 0; }
 .id-withdraw-note { color: var(--text-2); flex: 1; font-family: var(--ff-ui); }
 .id-withdraw-amt  { font-family: var(--ff-mono); font-weight: 600; flex-shrink: 0; }
+
+/* ── Funds Reminder Card ─────────────────────────────────────────────────── */
+
+.id-funds-card {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.id-funds-surplus { border-color: rgba(40,200,128,.3); background: rgba(40,200,128,.05); }
+.id-funds-deficit { border-color: rgba(220,53,69,.3);  background: rgba(220,53,69,.05); }
+
+.id-funds-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.id-funds-icon  { font-size: 16px; }
+.id-funds-title {
+  font-family: var(--ff-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  flex: 1;
+}
+.id-funds-badge {
+  font-family: var(--ff-head);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .4px;
+}
+.id-funds-badge-surplus { background: rgba(40,200,128,.15); color: var(--profit); }
+.id-funds-badge-deficit { background: rgba(220,53,69,.15);  color: var(--loss); }
+.id-funds-badge-neutral { background: var(--surface-2); color: var(--text-2); }
+
+.id-funds-amount {
+  font-family: var(--ff-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.5px;
+  line-height: 1;
+}
+.id-funds-sub {
+  font-family: var(--ff-ui);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: -2px;
+}
+.id-funds-action {
+  font-family: var(--ff-ui);
+  font-size: 12px;
+  color: var(--text-1);
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  margin-top: 2px;
+}
+
+/* AI suggestion area */
+.id-funds-suggestion {
+  font-family: var(--ff-ui);
+  font-size: 12.5px;
+  color: var(--text-1);
+  line-height: 1.65;
+  min-height: 40px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  margin-top: 2px;
+  white-space: pre-wrap;
+}
+
+/* Typing dots loader */
+.id-funds-loading {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 0;
+}
+.id-funds-dot {
+  width: 6px; height: 6px;
+  background: var(--text-3);
+  border-radius: 50%;
+  animation: idFundsPulse 1.2s ease-in-out infinite;
+}
+.id-funds-dot:nth-child(2) { animation-delay: .2s; }
+.id-funds-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes idFundsPulse {
+  0%, 80%, 100% { opacity: .25; transform: scale(.8); }
+  40%           { opacity: 1;   transform: scale(1); }
+}
+
+.id-funds-ai-btn {
+  font-family: var(--ff-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity var(--tx);
+}
+.id-funds-ai-btn:hover { opacity: .8; }
 
 /* ── Intraday Confirm Popup ───────────────────────────────────────────────── */
 
