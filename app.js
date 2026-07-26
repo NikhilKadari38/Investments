@@ -444,17 +444,12 @@ function _renderTable() {
 
   if (filtered.length === 0) return;
 
-  // Assign fixed serial numbers based on oldest-first order
+  // Assign serial numbers in original order
   const serialMap = {};
-  [...filtered].sort((a, b) => (a.buyDate || "").localeCompare(b.buyDate || "")).forEach((t, i) => {
-    serialMap[t.id] = i + 1;
-  });
+  filtered.forEach((t, i) => { serialMap[t.id] = i + 1; });
 
-  // Sort display order
-  filtered.sort((a, b) => {
-    const da = a.buyDate || "", db = b.buyDate || "";
-    return _tradeSort === "newest" ? db.localeCompare(da) : da.localeCompare(db);
-  });
+  // Reverse display order if toggled
+  if (_tradeSort === "oldest") filtered.reverse();
 
   filtered.forEach((trade, i) => {
     const tr       = document.createElement("tr");
