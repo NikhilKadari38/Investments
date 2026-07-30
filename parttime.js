@@ -1,0 +1,444 @@
+// ─── NK Trade Tracker — Part-Time & Expenses Module ─────────────────────────
+
+const PTT_HOURS_KEY    = "ptt_hours_v1";
+const PTT_RATE_KEY     = "ptt_rate_v1";
+const PTT_SALARY_KEY   = "ptt_salary_v1";
+const PTT_TX_KEY       = "ptt_transactions_v1"; // [{ id, date, type, category, amount }]
+const PTT_BANK_KEY     = "ptt_bank_init_v1";    // number — opening balance
+
+const MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+const DOW    = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+let _pttYear  = new Date().getFullYear();
+let _pttMonth = new Date().getMonth();
+let _pttInit  = false;
+let _txType   = "expense"; // active form type
+
+const _$       = (id)    => document.getElementById(id);
+const _pad     = (n)     => String(n).padStart(2, "0");
+const _today   = ()      => { const n = new Date(); return `${n.getFullYear()}-${_pad(n.getMonth()+1)}-${_pad(n.getDate())}`; };
+const _dateKey = (y,m,d) => `${y}-${_pad(m+1)}-${_pad(d)}`;
+const _monKey  = (y,m)   => `${y}-${_pad(m+1)}`;
+
+function _fmtE(v) {
+  return "€" + Number(v).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function _fmtDate(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function _getHours()    { try { return JSON.parse(localStorage.getItem(PTT_HOURS_KEY)  || "{}"); } catch { return {}; } }
+function _getSalaries() { try { return JSON.parse(localStorage.getItem(PTT_SALARY_KEY)|| "{}"); } catch { return {}; } }
+function _getTxs()      { try { return JSON.parse(localStorage.getItem(PTT_TX_KEY)    || "[]"); } catch { return []; } }
+function _getRate()     { const v = parseFloat(localStorage.getItem(PTT_RATE_KEY)); return isNaN(v) ? 14 : v; }
+function _getInitBal()  { return parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0"); }
+function _calcBalance(txs) {
+  return txs.reduce((bal, t) => t.type === "income" ? bal + t.amount : bal - t.amount, _getInitBal());
+}
+
+// ── Entry Point ───────────────────────────────────────────────────────────────
+export function initParttime() {
+  _renderAll();
+  if (_pttInit) return;
+  _pttInit = true;
+  if (localStorage.getItem(PTT_RATE_KEY) === null) localStorage.setItem(PTT_RATE_KEY, "14");
+  _bindPttEvents();
+}
+
+function _renderAll() {
+  _renderSettingsBar();
+  _renderCalendar();
+  _recalcSummary();
+  _renderHistory();
+  _renderBankBalance();
+}
+
+// ── Settings Bar ──────────────────────────────────────────────────────────────
+function _renderSettingsBar() {
+  const el = _$("pttSettingsBar");
+  if (!el) return;
+  const sal = _getSalaries()[_monKey(_pttYear, _pttMonth)] ?? 0;
+  el.innerHTML = `
+    <label class="ptt-sb-field">
+      <span class="ptt-sb-label">Hourly Rate (€)</span>
+      <input id="pttRateInput" type="number" step="0.5" min="0" value="${_getRate()}" class="ptt-sb-input" />
+    </label>
+    <label class="ptt-sb-field">
+      <span class="ptt-sb-label">Monthly Salary (€)</span>
+      <input id="pttSalaryInput" type="number" step="10" min="0" value="${sal || ""}" placeholder="0" class="ptt-sb-input" />
+    </label>`;
+
+  _$("pttRateInput").addEventListener("input", () => {
+    const v = parseFloat(_$("pttRateInput").value);
+    localStorage.setItem(PTT_RATE_KEY, isNaN(v) ? 14 : v);
+    _renderCalendar();
+    _recalcSummary();
+    _renderHistory();
+  });
+
+  _$("pttSalaryInput").addEventListener("input", () => {
+    const v    = parseFloat(_$("pttSalaryInput").value);
+    const sals = _getSalaries();
+    sals[_monKey(_pttYear, _pttMonth)] = isNaN(v) ? 0 : v;
+    localStorage.setItem(PTT_SALARY_KEY, JSON.stringify(sals));
+    _recalcSummary();
+    _renderHistory();
+  });
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function _renderCalendar() {
+  const wrap = _$("pttCalendar");
+  if (!wrap) return;
+
+  const rate        = _getRate();
+  const hoursData   = _getHours();
+  const daysInMonth = new Date(_pttYear, _pttMonth + 1, 0).getDate();
+  const firstDay    = new Date(_pttYear, _pttMonth, 1).getDay();
+  const startOffset = (firstDay + 6) % 7; // Mon=0
+  const todayStr    = _today();
+  const mk          = _monKey(_pttYear, _pttMonth);
+
+  // Nav + grid wrapper
+  wrap.innerHTML = `
+    <div class="ptt-cal-nav">
+      <button class="ptt-nav-btn" id="pttPrevMonth">&#8592;</button>
+      <h2 class="ptt-cal-title">${MONTHS[_pttMonth]} ${_pttYear}</h2>
+      <button class="ptt-nav-btn" id="pttNextMonth">&#8594;</button>
+    </div>
+    <div class="ptt-cal-card">
+      <div class="ptt-cal-grid" id="pttCalGrid"></div>
+    </div>`;
+
+  const grid = _$("pttCalGrid");
+
+  // Day-of-week headers
+  DOW.forEach((d, i) => {
+    const el = document.createElement("div");
+    el.className = "ptt-dow" + (i >= 5 ? " ptt-dow-wknd" : "");
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  // Empty cells before 1st
+  for (let i = 0; i < startOffset; i++) {
+    const el = document.createElement("div");
+    el.className = "ptt-day ptt-day-empty";
+    grid.appendChild(el);
+  }
+
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key    = _dateKey(_pttYear, _pttMonth, d);
+    const col    = (startOffset + d - 1) % 7;
+    const isWknd = col >= 5;
+    const stored = hoursData[key];
+    const h      = stored != null ? parseFloat(stored) : 0;
+
+    const cell = document.createElement("div");
+    cell.className = "ptt-day" +
+      (isWknd        ? " ptt-day-wknd"  : "") +
+      (key===todayStr? " ptt-day-today" : "");
+
+    // Day number
+    const num = document.createElement("div");
+    num.className = "ptt-day-num";
+    num.textContent = d;
+    cell.appendChild(num);
+
+    // Hours input
+    const input = document.createElement("input");
+    input.className   = "ptt-hrs-inp";
+    input.type        = "number";
+    input.min         = "0";
+    input.max         = "24";
+    input.step        = "0.25";
+    input.placeholder = "-";
+    if (h > 0) input.value = h;
+    cell.appendChild(input);
+
+    // Earnings label
+    const earn = document.createElement("div");
+    earn.className = "ptt-day-earn";
+    earn.textContent = h > 0 ? _fmtE(h * rate) : "";
+    cell.appendChild(earn);
+
+    input.addEventListener("input", () => {
+      const val  = parseFloat(input.value);
+      const data = _getHours();
+      if (isNaN(val) || val <= 0) { delete data[key]; earn.textContent = ""; }
+      else { data[key] = val; earn.textContent = _fmtE(val * rate); }
+      localStorage.setItem(PTT_HOURS_KEY, JSON.stringify(data));
+      _recalcSummary();
+      _renderHistory();
+    });
+
+    grid.appendChild(cell);
+  }
+
+  // Month nav
+  _$("pttPrevMonth").addEventListener("click", () => {
+    _pttMonth--;
+    if (_pttMonth < 0) { _pttMonth = 11; _pttYear--; }
+    _renderSettingsBar();
+    _renderCalendar();
+    _recalcSummary();
+  });
+  _$("pttNextMonth").addEventListener("click", () => {
+    _pttMonth++;
+    if (_pttMonth > 11) { _pttMonth = 0; _pttYear++; }
+    _renderSettingsBar();
+    _renderCalendar();
+    _recalcSummary();
+  });
+}
+
+// ── Summary (recalc only, no full re-render) ──────────────────────────────────
+function _recalcSummary() {
+  const hoursData = _getHours();
+  const rate      = _getRate();
+  const salaries  = _getSalaries();
+  const mk        = _monKey(_pttYear, _pttMonth);
+  const salary    = salaries[mk] ?? 0;
+
+  let totalHours = 0;
+  Object.keys(hoursData).forEach(k => {
+    if (k.startsWith(mk)) totalHours += hoursData[k];
+  });
+  const totalEarn = totalHours * rate;
+  const diff      = totalEarn - salary;
+  const pct       = salary > 0 ? (totalEarn / salary) * 100 : null;
+
+  const el = _$("pttMonthSummary");
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="ptt-sum-cards">
+      <div class="ptt-sum-card">
+        <span class="ptt-sum-label">Total Hours</span>
+        <span class="ptt-sum-val">${totalHours.toFixed(1)}</span>
+      </div>
+      <div class="ptt-sum-card">
+        <span class="ptt-sum-label">Total Earnings</span>
+        <span class="ptt-sum-val profit">${_fmtE(totalEarn)}</span>
+      </div>
+      <div class="ptt-sum-card">
+        <span class="ptt-sum-label">VS. Salary</span>
+        <span class="ptt-sum-val ${salary > 0 ? (diff >= 0 ? "profit" : "loss") : ""}">${salary > 0 ? (diff >= 0 ? "" : "") + _fmtE(diff) : "—"}</span>
+      </div>
+      <div class="ptt-sum-card">
+        <span class="ptt-sum-label">% of Salary</span>
+        <span class="ptt-sum-val ${pct !== null && pct >= 100 ? "profit" : ""}">${pct !== null ? pct.toFixed(1) + "%" : "—"}</span>
+      </div>
+    </div>`;
+}
+
+// ── History Table ─────────────────────────────────────────────────────────────
+function _renderHistory() {
+  const el = _$("pttHistory");
+  if (!el) return;
+
+  const hoursData = _getHours();
+  const salaries  = _getSalaries();
+  const rate      = _getRate();
+
+  // Group by month
+  const byMonth = {};
+  Object.keys(hoursData).forEach(k => {
+    const mk = k.slice(0, 7);
+    byMonth[mk] = (byMonth[mk] || 0) + hoursData[k];
+  });
+  const months = Object.keys(byMonth).sort().reverse();
+
+  let bodyHtml = "";
+  if (!months.length) {
+    bodyHtml = `<tr class="ptt-empty-row"><td colspan="5">No hours logged yet — start typing in the calendar above.</td></tr>`;
+  } else {
+    months.forEach(mk => {
+      const [yy, mm] = mk.split("-");
+      const label = `${MONTHS[parseInt(mm, 10) - 1]} ${yy}`;
+      const h    = byMonth[mk];
+      const earn = h * rate;
+      const sal  = salaries[mk] ?? 0;
+      const diff = earn - sal;
+      const dcls = sal > 0 ? (diff >= 0 ? "profit" : "loss") : "";
+      bodyHtml += `<tr>
+        <td>${label}</td>
+        <td class="td-num-right">${h.toFixed(1)}</td>
+        <td class="td-num-right profit">${_fmtE(earn)}</td>
+        <td class="td-num-right">${sal ? _fmtE(sal) : "—"}</td>
+        <td class="td-num-right ${dcls}">${sal ? _fmtE(diff) : "—"}</td>
+      </tr>`;
+    });
+  }
+
+  el.innerHTML = `
+    <div class="ptt-history-card">
+      <h3 class="ptt-history-title">Monthly History</h3>
+      <table class="ptt-hist-table">
+        <thead><tr>
+          <th>Month</th>
+          <th class="td-num-right">Hours</th>
+          <th class="td-num-right">Earnings</th>
+          <th class="td-num-right">Salary</th>
+          <th class="td-num-right">Difference</th>
+        </tr></thead>
+        <tbody>${bodyHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Bank Balance Panel ────────────────────────────────────────────────────────
+function _renderBankBalance() {
+  const aside = _$("pttExpensePanel");
+  if (!aside) return;
+
+  const txs     = _getTxs();
+  const today   = _today();
+  const balance = _calcBalance(txs);
+  const balCls  = balance >= 0 ? "profit" : "loss";
+
+  // Compute running balance per transaction (oldest → newest)
+  const withBal = [...txs].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  let running = _getInitBal();
+  withBal.forEach(t => {
+    running = t.type === "income" ? running + t.amount : running - t.amount;
+    t._balAfter = running;
+  });
+  withBal.reverse(); // show newest first
+
+  // This month totals
+  const thisMon    = today.slice(0, 7);
+  const monIncome  = txs.filter(t => t.date.startsWith(thisMon) && t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const monExpense = txs.filter(t => t.date.startsWith(thisMon) && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+
+  aside.innerHTML = `
+    <h2 class="sum-head">Bank Balance</h2>
+
+    <div class="ptt-bal-hero">
+      <div class="ptt-bal-hero-top">
+        <div>
+          <div class="ptt-exp-hero-label">Current Balance</div>
+          <div class="ptt-bal-val ${balCls}">${_fmtE(balance)}</div>
+        </div>
+        <button class="ptt-set-init-btn" id="pttSetInitBtn" title="Set opening balance">✎ Set Initial</button>
+      </div>
+      <div class="ptt-bal-mon-row">
+        <span class="ptt-bal-mon-item">
+          <span class="ptt-bal-mon-label">This Month In</span>
+          <span class="profit">+${_fmtE(monIncome)}</span>
+        </span>
+        <span class="ptt-bal-mon-divider"></span>
+        <span class="ptt-bal-mon-item">
+          <span class="ptt-bal-mon-label">This Month Out</span>
+          <span class="loss">-${_fmtE(monExpense)}</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="ptt-tx-type-toggle">
+      <button class="ptt-type-btn${_txType === "expense" ? " active-expense" : ""}" data-type="expense">− Expense</button>
+      <button class="ptt-type-btn${_txType === "income"  ? " active-income"  : ""}" data-type="income">+ Income</button>
+    </div>
+
+    <div class="ptt-exp-form">
+      <input type="date" id="pttExpDate" value="${today}" class="ptt-form-input" />
+      <input type="text" id="pttExpCat" placeholder="${_txType === "income" ? "Source (Salary, Splitwise…)" : "Category (Rent, Food, Gym…)"}" class="ptt-form-input" autocomplete="off" />
+      <div class="ptt-exp-amt-row">
+        <span class="ptt-curr-sym">€</span>
+        <input type="number" id="pttExpAmt" placeholder="0.00" min="0" step="0.01" class="ptt-form-input ptt-amt-input" />
+        <button class="btn-primary ptt-add-btn ${_txType === "income" ? "ptt-add-income" : ""}" id="pttExpAddBtn">Add</button>
+      </div>
+    </div>
+
+    <div class="sum-graph-sep"></div>
+
+    <div class="ptt-exp-list">
+      ${withBal.length === 0
+        ? `<div class="ptt-history-empty">No transactions yet. Add your opening balance first.</div>`
+        : withBal.map(t => `
+          <div class="ptt-tx-row">
+            <div class="ptt-exp-left">
+              <span class="ptt-exp-date">${_fmtDate(t.date)}</span>
+              <span class="ptt-exp-cat">${t.category}</span>
+            </div>
+            <div class="ptt-tx-right">
+              <div class="ptt-tx-amt ${t.type === "income" ? "profit" : "loss"}">
+                ${t.type === "income" ? "+" : "−"}${_fmtE(t.amount)}
+              </div>
+              <div class="ptt-tx-bal">→ ${_fmtE(t._balAfter)}</div>
+              <button class="ptt-exp-del" data-id="${t.id}">✕</button>
+            </div>
+          </div>`).join("")}
+    </div>`;
+
+  // Type toggle
+  aside.querySelectorAll(".ptt-type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _txType = btn.dataset.type;
+      _renderBankBalance();
+    });
+  });
+
+  // Set initial balance — styled modal
+  _$("pttSetInitBtn")?.addEventListener("click", () => {
+    const input = _$("pttInitBalInput");
+    if (input) input.value = _getInitBal() || "";
+    _$("pttInitBalModal")?.classList.remove("hidden");
+    setTimeout(() => input?.focus(), 50);
+  });
+
+  // Add transaction
+  _$("pttExpAddBtn")?.addEventListener("click", _addTx);
+
+  // Delete
+  aside.querySelectorAll(".ptt-exp-del").forEach(btn => {
+    btn.addEventListener("click", () => _deleteTx(btn.dataset.id));
+  });
+}
+
+function _addTx() {
+  const date = _$("pttExpDate")?.value;
+  const cat  = _$("pttExpCat")?.value.trim();
+  const amt  = parseFloat(_$("pttExpAmt")?.value);
+  if (!date || !cat || isNaN(amt) || amt <= 0) return;
+  const txs = _getTxs();
+  txs.push({ id: Date.now().toString(), date, type: _txType, category: cat, amount: amt });
+  localStorage.setItem(PTT_TX_KEY, JSON.stringify(txs));
+  if (_$("pttExpCat")) _$("pttExpCat").value = "";
+  if (_$("pttExpAmt")) _$("pttExpAmt").value = "";
+  _renderBankBalance();
+}
+
+function _deleteTx(id) {
+  localStorage.setItem(PTT_TX_KEY, JSON.stringify(_getTxs().filter(t => t.id !== id)));
+  _renderBankBalance();
+}
+
+function _bindPttEvents() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && document.activeElement?.id === "pttExpAmt") _addTx();
+    if (e.key === "Enter" && document.activeElement?.id === "pttInitBalInput") _confirmInitBal();
+    if (e.key === "Escape") _$("pttInitBalModal")?.classList.add("hidden");
+  });
+
+  _$("pttInitBalConfirm")?.addEventListener("click", _confirmInitBal);
+
+  const closeModal = () => _$("pttInitBalModal")?.classList.add("hidden");
+  _$("pttInitBalCancel")?.addEventListener("click", closeModal);
+  _$("pttInitBalClose")?.addEventListener("click", closeModal);
+  _$("pttInitBalModal")?.addEventListener("click", (e) => {
+    if (e.target === _$("pttInitBalModal")) closeModal();
+  });
+}
+
+function _confirmInitBal() {
+  const val = parseFloat(_$("pttInitBalInput")?.value);
+  if (isNaN(val)) return;
+  localStorage.setItem(PTT_BANK_KEY, val);
+  _$("pttInitBalModal")?.classList.add("hidden");
+  _renderBankBalance();
+}

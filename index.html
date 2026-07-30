@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en-GB" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -59,6 +59,8 @@
         <a class="nav-link active" data-page="portfolio">Swing</a>
         <a class="nav-link" data-page="intraday">Intraday</a>
         <a class="nav-link" data-page="research">Research</a>
+        <a class="nav-link" data-page="parttime">Part-Time</a>
+        <a class="nav-link" data-page="networth">Net Worth</a>
       </nav>
       <div class="header-right">
         <button class="ai-header-btn" id="aiToggle" title="Ask Tara">Ask Tara</button>
@@ -240,6 +242,38 @@
         </div>
       </section>
       <aside class="section-right" id="intradaySummary"></aside>
+    </main>
+
+    <!-- Part-Time Page -->
+    <main id="page-parttime" class="main-content hidden">
+      <section class="section-left ptt-left">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h1 class="section-title">Part-Time</h1>
+          </div>
+          <div id="pttSettingsBar" class="ptt-settings-bar"></div>
+        </div>
+        <div class="ptt-scroll-body">
+          <div id="pttCalendar" class="ptt-calendar-wrap"></div>
+          <div id="pttMonthSummary" class="ptt-month-summary"></div>
+          <div id="pttHistory" class="ptt-history-section"></div>
+        </div>
+      </section>
+      <aside class="section-right" id="pttExpensePanel"></aside>
+    </main>
+
+    <!-- Net Worth Page -->
+    <main id="page-networth" class="main-content hidden">
+      <section class="section-left nw-left">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h1 class="section-title">Net Worth</h1>
+          </div>
+          <button class="nw-refresh-btn" id="nwRefresh" title="Refresh data">↻</button>
+        </div>
+        <div class="nw-scroll-body" id="nwPlatforms"></div>
+      </section>
+      <aside class="section-right nw-right-panel" id="nwSummaryPanel"></aside>
     </main>
 
     <!-- Research Page -->
@@ -472,7 +506,35 @@
       <span class="mob-nav-icon">🔍</span>
       <span>Research</span>
     </a>
+    <a class="nav-link mob-nav-link" data-page="parttime">
+      <span class="mob-nav-icon">💼</span>
+      <span>Part-Time</span>
+    </a>
+    <a class="nav-link mob-nav-link" data-page="networth">
+      <span class="mob-nav-icon">💰</span>
+      <span>Net Worth</span>
+    </a>
   </nav>
+
+  <!-- ── Set Opening Balance Modal ────────────────────────────────────────── -->
+  <div id="pttInitBalModal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Opening Balance</h3>
+        <button class="modal-close" id="pttInitBalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="pttInitBalInput">Starting balance in your account (€)</label>
+          <input type="number" id="pttInitBalInput" placeholder="0.00" step="0.01" min="0" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="pttInitBalCancel">Cancel</button>
+        <button class="btn-primary" id="pttInitBalConfirm">Set Balance</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Mobile FAB ──────────────────────────────────────────────────────── -->
   <button class="fab-add hidden" id="fabAdd">+ Add Trade</button>

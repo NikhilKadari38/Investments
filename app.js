@@ -8,6 +8,8 @@ import {
 import { fetchLivePrice } from "./prices.js";
 import { initResearch } from "./research.js";
 import { initIntraday } from "./intraday.js";
+import { initParttime } from "./parttime.js";
+import { initNetworth } from "./networth.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let trades          = [];
@@ -95,12 +97,16 @@ function _getCurrentPage() {
   const hash = location.hash.replace("#", "").toLowerCase();
   if (hash === "research")  return "research";
   if (hash === "intraday")  return "intraday";
+  if (hash === "parttime")  return "parttime";
+  if (hash === "networth")  return "networth";
   return "portfolio";
 }
 
 function _navigateTo(page) {
   if (page === "research")  { location.hash = "Research";  return; }
   if (page === "intraday")  { location.hash = "Intraday";  return; }
+  if (page === "parttime")  { location.hash = "Parttime";  return; }
+  if (page === "networth")  { location.hash = "Networth";  return; }
   location.hash = "Swing";
 }
 
@@ -108,15 +114,21 @@ function _showPage(page) {
   const portfolio = $("page-portfolio");
   const intraday  = $("page-intraday");
   const research  = $("page-research");
+  const parttime  = $("page-parttime");
+  const networth  = $("page-networth");
   const fab       = $("fabAdd");
   if (portfolio) portfolio.classList.toggle("hidden", page !== "portfolio");
   if (intraday)  intraday.classList.toggle("hidden",  page !== "intraday");
   if (research)  research.classList.toggle("hidden",  page !== "research");
-  if (fab && window.innerWidth <= 768) fab.classList.toggle("hidden", page === "research");
+  if (parttime)  parttime.classList.toggle("hidden",  page !== "parttime");
+  if (networth)  networth.classList.toggle("hidden",  page !== "networth");
+  if (fab && window.innerWidth <= 768) fab.classList.toggle("hidden", page !== "portfolio" && page !== "intraday");
   document.querySelectorAll(".nav-link").forEach((l) => {
     l.classList.toggle("active", l.dataset.page === page);
   });
   if (page === "intraday") initIntraday(intradayFund);
+  if (page === "parttime") initParttime();
+  if (page === "networth") initNetworth();
 }
 
 function _initRouter() {
