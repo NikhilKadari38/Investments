@@ -141,28 +141,14 @@ function _renderShell() {
 
   left.innerHTML =
     '<p class="nw-section-label">Investments</p>' +
-    PLATFORMS.map(_buildPlatformCard).join("") +
+    '<div class="nw-blocks-grid">' +
+      PLATFORMS.map((p, i) => _buildBlock(p, i * 90)).join("") +
+    '</div>' +
     '<p class="nw-section-label nw-section-label-bank">Bank</p>' +
-    '<div class="nw-platform-card" id="nwCardBank" style="--nw-c:#22c55e">' +
-      '<div class="nw-card-header" id="nwHeaderBank">' +
-        '<div class="nw-card-info">' +
-          '<div class="nw-card-logo-circle" style="background:#22c55e;box-shadow:0 4px 14px rgba(34,197,94,.35)">€</div>' +
-          '<div>' +
-            '<div class="nw-card-name">Bank Balance</div>' +
-            '<div class="nw-card-sub">Personal Account</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="nw-card-right">' +
-          '<div class="nw-card-value" id="nwValBank"><span class="nw-spinner"></span></div>' +
-          '<button class="nw-expand-btn" id="nwToggleBank">▼</button>' +
-        '</div>' +
-      '</div>' +
-      '<div class="nw-card-detail hidden" id="nwDetailBank"></div>' +
-    '</div>';
+    _buildBankBlock();
 
   right.innerHTML =
     '<div class="nw-right-inner">' +
-      /* ── Hero total ── */
       '<div class="nw-hero-card">' +
         '<div class="nw-hero-orb"></div>' +
         '<div class="nw-hero-orb nw-hero-orb2"></div>' +
@@ -170,8 +156,6 @@ function _renderShell() {
         '<div class="nw-hero-amount" id="nwHeroEur">–</div>' +
         '<div class="nw-hero-sub" id="nwHeroInr">–</div>' +
       '</div>' +
-
-      /* ── Currency breakdown ── */
       '<div class="nw-currency-boxes">' +
         '<div class="nw-currency-box nw-inr-box">' +
           '<div class="nw-cb-sym">₹</div>' +
@@ -184,8 +168,6 @@ function _renderShell() {
           '<div class="nw-cb-value" id="nwTotalEur">–</div>' +
         '</div>' +
       '</div>' +
-
-      /* ── Exchange rate ── */
       '<div class="nw-rate-card">' +
         '<div class="nw-rate-pill">🔄</div>' +
         '<div class="nw-rate-body">' +
@@ -197,33 +179,49 @@ function _renderShell() {
           '</div>' +
         '</div>' +
       '</div>' +
-
-      /* ── Allocation ── */
       '<div class="nw-breakdown-card" id="nwBreakdown"></div>' +
     '</div>';
 }
 
-function _buildPlatformCard(p) {
-  const glow = p.color.replace('#', '');
-  const r = parseInt(glow.slice(0,2),16);
-  const g = parseInt(glow.slice(2,4),16);
-  const b = parseInt(glow.slice(4,6),16);
+function _rgb(hex) {
+  const h = hex.replace('#','');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+function _buildBlock(p, delay) {
+  const [r,g,b] = _rgb(p.color);
   return (
-    '<div class="nw-platform-card" id="nwCard' + p.id + '" style="--nw-c:' + p.color + ';--nw-r:' + r + ';--nw-g:' + g + ';--nw-b:' + b + '">' +
-      '<div class="nw-card-header" id="nwHeader' + p.id + '">' +
-        '<div class="nw-card-info">' +
-          '<div class="nw-card-logo-circle" style="background:' + p.color + ';box-shadow:0 4px 14px rgba(' + r + ',' + g + ',' + b + ',.38)">' + p.letter + '</div>' +
-          '<div>' +
-            '<div class="nw-card-name">' + p.name + '</div>' +
-            '<div class="nw-card-sub">Swing · Intraday</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="nw-card-right">' +
-          '<div class="nw-card-value" id="nwVal' + p.id + '"><span class="nw-spinner"></span></div>' +
-          '<button class="nw-expand-btn" id="nwToggle' + p.id + '">▼</button>' +
-        '</div>' +
+    '<div class="nw-block" id="nwBlock' + p.id + '" ' +
+        'style="--nw-c:' + p.color + ';--nw-r:' + r + ';--nw-g:' + g + ';--nw-b:' + b + ';animation-delay:' + delay + 'ms">' +
+      '<div class="nw-block-head">' +
+        '<div class="nw-bh-orb"></div>' +
+        '<div class="nw-bh-logo" style="background:' + p.color + ';box-shadow:0 4px 16px rgba(' + r + ',' + g + ',' + b + ',.45)">' + p.letter + '</div>' +
+        '<div class="nw-bh-amount" id="nwVal' + p.id + '"><span class="nw-spinner"></span></div>' +
+        '<div class="nw-bh-name">' + p.name + '</div>' +
+        '<div class="nw-bh-sub">Swing · Intraday</div>' +
       '</div>' +
-      '<div class="nw-card-detail hidden" id="nwDetail' + p.id + '"></div>' +
+      '<div class="nw-block-body" id="nwStats' + p.id + '">' +
+        '<div style="padding:12px;text-align:center"><span class="nw-spinner"></span></div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function _buildBankBlock() {
+  const [r,g,b] = _rgb('#22c55e');
+  return (
+    '<div class="nw-block nw-block-wide" id="nwBlockBank" ' +
+        'style="--nw-c:#22c55e;--nw-r:' + r + ';--nw-g:' + g + ';--nw-b:' + b + ';animation-delay:180ms">' +
+      '<div class="nw-block-head">' +
+        '<div class="nw-bh-orb"></div>' +
+        '<div class="nw-bh-logo" style="background:#22c55e;box-shadow:0 4px 16px rgba(34,197,94,.45)">€</div>' +
+        '<div class="nw-bh-amount" id="nwValBank"><span class="nw-spinner"></span></div>' +
+        '<div class="nw-bh-name">Bank Balance</div>' +
+        '<div class="nw-bh-sub">Personal Account</div>' +
+      '</div>' +
+      '<div class="nw-block-body" id="nwStatsBank">' +
+        '<div style="padding:12px;text-align:center"><span class="nw-spinner"></span></div>' +
+      '</div>' +
     '</div>'
   );
 }
@@ -244,76 +242,83 @@ function _renderPlatform(p) {
   const total       = swingVal + intradayVal;
 
   const valEl = $("nwVal" + p.id);
-  if (valEl) valEl.innerHTML = _fmtINR(total);
+  if (valEl) _countUp(valEl, total, false);
 
-  const detail = $("nwDetail" + p.id);
-  if (!detail) return;
+  const stats = $("nwStats" + p.id);
+  if (!stats) return;
 
-  let html = "";
+  const hasSwing    = d.swing    && (d.swing.openCount + d.swing.closedCount > 0 || d.swing.deposited > 0);
+  const hasIntraday = d.intraday && (d.intraday.capital > 0 || d.intraday.totalDays > 0);
 
-  if (d.swing && (d.swing.openCount + d.swing.closedCount > 0 || d.swing.deposited > 0)) {
-    html +=
-      '<div class="nw-detail-section">' +
-        '<div class="nw-detail-section-title">Swing Trading</div>' +
-        '<div class="nw-detail-grid">' +
-          _diItem("Current Value",   _fmtINR(d.swing.currentOpen), "accent") +
-          _diItem("Available Funds", _fmtINR(d.swing.freeCash)) +
-          _diItem("Deposited",       _fmtINR(d.swing.deposited)) +
-          _diItem("Open Positions",  d.swing.openCount + " trade" + (d.swing.openCount !== 1 ? "s" : "")) +
-        '</div>' +
-      '</div>';
+  if (!hasSwing && !hasIntraday) {
+    stats.innerHTML = '<div class="nw-block-empty">No data yet</div>';
+    return;
   }
 
-  if (d.intraday && (d.intraday.capital > 0 || d.intraday.totalDays > 0)) {
+  let tiles = "";
+
+  if (hasSwing) {
+    tiles +=
+      _tile("Swing Value",  _fmtINR(d.swing.currentOpen), "accent") +
+      _tile("Available",    _fmtINR(d.swing.freeCash)) +
+      _tile("Deposited",    _fmtINR(d.swing.deposited)) +
+      _tile("Open Trades",  d.swing.openCount + " trade" + (d.swing.openCount !== 1 ? "s" : ""));
+  }
+  if (hasIntraday) {
     const net = d.intraday.totalEffective - d.intraday.totalWithdrawn;
-    html +=
-      '<div class="nw-detail-section' + (html ? " nw-detail-sep" : "") + '">' +
-        '<div class="nw-detail-section-title">Intraday Trading</div>' +
-        '<div class="nw-detail-grid">' +
-          _diItem("Current Value",  _fmtINR(d.intraday.value), "accent") +
-          _diItem("Capital",        _fmtINR(d.intraday.capital)) +
-          _diItem("Net P&L",        _fmtINR(net), net >= 0 ? "profit" : "loss") +
-          _diItem("Withdrawn",      _fmtINR(d.intraday.totalWithdrawn)) +
-          _diItem("Trading Days",   d.intraday.totalDays) +
-          _diItem("Win Rate",       d.intraday.totalDays > 0 ? d.intraday.winRate + "%" : "–") +
-        '</div>' +
-      '</div>';
+    tiles +=
+      _tile("Intraday",    _fmtINR(d.intraday.value), "accent") +
+      _tile("Capital",     _fmtINR(d.intraday.capital)) +
+      _tile("Net P&L",     _fmtINR(net), net >= 0 ? "profit" : "loss") +
+      _tile("Days Traded", d.intraday.totalDays || "–");
   }
 
-  detail.innerHTML = html || '<div class="nw-detail-empty">No data yet</div>';
+  stats.innerHTML = '<div class="nw-tile-grid">' + tiles + '</div>';
 }
 
-function _diItem(label, value, cls) {
+function _tile(label, value, cls) {
   return (
-    '<div class="nw-detail-item">' +
-      '<span class="nw-di-label">' + label + '</span>' +
-      '<span class="nw-di-value' + (cls ? " " + cls : "") + '">' + value + '</span>' +
+    '<div class="nw-tile">' +
+      '<div class="nw-tile-val' + (cls ? " " + cls : "") + '">' + value + '</div>' +
+      '<div class="nw-tile-label">' + label + '</div>' +
     '</div>'
   );
 }
 
 function _renderBank() {
-  const valEl = $("nwValBank");
-  if (valEl) valEl.innerHTML = _fmtEUR(_bank);
-
-  const detail = $("nwDetailBank");
-  if (!detail) return;
-
   const initBal = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0");
   const txs     = JSON.parse(localStorage.getItem(PTT_TX_KEY) || "[]");
   const income  = txs.filter(t => t.type === "income").reduce((s, t)  => s + t.amount, 0);
   const expense = txs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
-  detail.innerHTML =
-    '<div class="nw-detail-section">' +
-      '<div class="nw-detail-grid">' +
-        _diItem("Current Balance",  _fmtEUR(_bank),    "accent") +
-        _diItem("Opening Balance",  _fmtEUR(initBal)) +
-        _diItem("Total Income",    "+" + _fmtEUR(income),  "profit") +
-        _diItem("Total Expenses",  "−" + _fmtEUR(expense), "loss") +
-        _diItem("Transactions",     txs.length) +
-      '</div>' +
+  const valEl = $("nwValBank");
+  if (valEl) _countUp(valEl, _bank, true);
+
+  const stats = $("nwStatsBank");
+  if (!stats) return;
+
+  stats.innerHTML =
+    '<div class="nw-tile-grid nw-tile-grid-4">' +
+      _tile("Balance",     _fmtEUR(_bank),    "accent") +
+      _tile("Opening",     _fmtEUR(initBal)) +
+      _tile("Income",      "+" + _fmtEUR(income),  "profit") +
+      _tile("Expenses",    "−" + _fmtEUR(expense),  "loss") +
     '</div>';
+}
+
+// ─── Number counter animation ─────────────────────────────────────────────────
+function _countUp(el, rawVal, isEUR, ms = 900) {
+  if (!rawVal || rawVal === 0) { el.textContent = isEUR ? _fmtEUR(0) : _fmtINR(0); return; }
+  const start = performance.now();
+  const tick  = (now) => {
+    const p = Math.min((now - start) / ms, 1);
+    const e = 1 - Math.pow(1 - p, 3);          // ease-out-cubic
+    const v = rawVal * e;
+    el.textContent = isEUR ? _fmtEUR(v) : _fmtINR(v);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = isEUR ? _fmtEUR(rawVal) : _fmtINR(rawVal);
+  };
+  requestAnimationFrame(tick);
 }
 
 function _renderSummary() {
@@ -395,18 +400,6 @@ function _renderSummary() {
 // ─── Events ───────────────────────────────────────────────────────────────────
 function _bindEvents() {
   document.addEventListener("click", async (e) => {
-    PLATFORMS.forEach(p => {
-      const header = $("nwHeader" + p.id);
-      if (header && (e.target === header || header.contains(e.target))) {
-        _toggleDetail("nwDetail" + p.id, "nwToggle" + p.id);
-      }
-    });
-
-    const bankHeader = $("nwHeaderBank");
-    if (bankHeader && (e.target === bankHeader || bankHeader.contains(e.target))) {
-      _toggleDetail("nwDetailBank", "nwToggleBank");
-    }
-
     if (e.target.id === "nwRefresh") {
       const btn = e.target;
       btn.classList.add("nw-spinning");
@@ -426,14 +419,6 @@ function _bindEvents() {
       _renderSummary();
     }
   });
-}
-
-function _toggleDetail(detailId, toggleId) {
-  const detail = $(detailId);
-  const btn    = $(toggleId);
-  if (!detail) return;
-  const isHidden = detail.classList.toggle("hidden");
-  if (btn) btn.textContent = isHidden ? "▼" : "▲";
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────

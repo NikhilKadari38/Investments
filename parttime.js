@@ -322,19 +322,19 @@ function _renderBankBalance() {
       <div class="ptt-bal-hero-top">
         <div>
           <div class="ptt-exp-hero-label">Current Balance</div>
-          <div class="ptt-bal-val ${balCls}">${_fmtE(balance)}</div>
+          <div class="ptt-bal-val">${_fmtE(balance)}</div>
         </div>
         <button class="ptt-set-init-btn" id="pttSetInitBtn" title="Set opening balance">✎ Set Initial</button>
       </div>
       <div class="ptt-bal-mon-row">
         <span class="ptt-bal-mon-item">
           <span class="ptt-bal-mon-label">This Month In</span>
-          <span class="profit">+${_fmtE(monIncome)}</span>
+          <span style="color:#4ade80;font-family:var(--ff-display);font-size:15px;font-weight:800">+${_fmtE(monIncome)}</span>
         </span>
         <span class="ptt-bal-mon-divider"></span>
         <span class="ptt-bal-mon-item">
           <span class="ptt-bal-mon-label">This Month Out</span>
-          <span class="loss">-${_fmtE(monExpense)}</span>
+          <span style="color:#f87171;font-family:var(--ff-display);font-size:15px;font-weight:800">-${_fmtE(monExpense)}</span>
         </span>
       </div>
     </div>
@@ -345,7 +345,7 @@ function _renderBankBalance() {
     </div>
 
     <div class="ptt-exp-form">
-      <input type="date" id="pttExpDate" value="${today}" class="ptt-form-input" />
+      <input type="text" id="pttExpDate" value="${_fmtDate(today)}" placeholder="DD/MM/YYYY" maxlength="10" class="ptt-form-input" />
       <input type="text" id="pttExpCat" placeholder="${_txType === "income" ? "Source (Salary, Splitwise…)" : "Category (Rent, Food, Gym…)"}" class="ptt-form-input" autocomplete="off" />
       <div class="ptt-exp-amt-row">
         <span class="ptt-curr-sym">€</span>
@@ -391,6 +391,14 @@ function _renderBankBalance() {
     setTimeout(() => input?.focus(), 50);
   });
 
+  // Auto-format date as DD/MM/YYYY while typing
+  _$("pttExpDate")?.addEventListener("input", (e) => {
+    let v = e.target.value.replace(/\D/g, "").slice(0, 8);
+    if (v.length >= 5) v = v.slice(0,2) + "/" + v.slice(2,4) + "/" + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0,2) + "/" + v.slice(2);
+    e.target.value = v;
+  });
+
   // Add transaction
   _$("pttExpAddBtn")?.addEventListener("click", _addTx);
 
@@ -401,10 +409,16 @@ function _renderBankBalance() {
 }
 
 function _addTx() {
-  const date = _$("pttExpDate")?.value;
-  const cat  = _$("pttExpCat")?.value.trim();
-  const amt  = parseFloat(_$("pttExpAmt")?.value);
-  if (!date || !cat || isNaN(amt) || amt <= 0) return;
+  const raw = (_$("pttExpDate")?.value || "").trim();
+  const cat = _$("pttExpCat")?.value.trim();
+  const amt = parseFloat(_$("pttExpAmt")?.value);
+  if (!raw || !cat || isNaN(amt) || amt <= 0) return;
+
+  // Parse DD/MM/YYYY → YYYY-MM-DD
+  const parts = raw.split("/");
+  if (parts.length !== 3 || parts[2].length !== 4) return;
+  const date = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+
   const txs = _getTxs();
   txs.push({ id: Date.now().toString(), date, type: _txType, category: cat, amount: amt });
   localStorage.setItem(PTT_TX_KEY, JSON.stringify(txs));

@@ -335,9 +335,9 @@ function _renderSummary() {
       <span class="sum-pl-pct" style="color:var(--text-3);font-size:11px">above capital</span>
     </div>
 
-    <div class="sum-pl-oval">
+    <div class="sum-pl-oval${withdrawals.length > 0 ? " id-withdrawn-clickable" : ""}" id="totalWithdrawnOval"${withdrawals.length > 0 ? ' style="cursor:pointer"' : ''}>
       <div>
-        <div class="sum-pl-label">Total Withdrawn</div>
+        <div class="sum-pl-label">Total Withdrawn${withdrawals.length > 0 ? " &nbsp;↗" : ""}</div>
         <div class="sum-pl-val">${_fmt(totalWithdrawn)}</div>
       </div>
       <span class="sum-pl-pct" style="color:var(--text-3);font-size:11px">${withdrawals.length} txn</span>
@@ -391,19 +391,6 @@ function _renderSummary() {
       </div>
     </div>
 
-    ${withdrawals.length > 0 ? `
-    <div class="sum-graph-sep"></div>
-    <div class="id-withdraw-log">
-      <div class="id-withdraw-log-title">Withdrawal Log</div>
-      ${withdrawals.slice().reverse().map(w => `
-        <div class="id-withdraw-row">
-          <span class="id-withdraw-date">${w.date}</span>
-          <span class="id-withdraw-note">${w.note || "—"}</span>
-          <span class="id-withdraw-amt loss">${_fmt(w.amount)}</span>
-        </div>
-      `).join("")}
-    </div>
-    ` : ""}
 
     ${capital > 0 ? _buildFundsCard({
       capital, totalEffective, totalWithdrawn,
@@ -414,6 +401,8 @@ function _renderSummary() {
   aside.querySelector(".id-edit-cap")?.addEventListener("click", _editCapital);
   const wOval = $("withdrawableOval");
   if (wOval && withdrawable > 0) wOval.addEventListener("click", () => _showWithdrawModal(withdrawable));
+  const wLogOval = $("totalWithdrawnOval");
+  if (wLogOval && withdrawals.length > 0) wLogOval.addEventListener("click", _showWithdrawLogModal);
 
   // Funds card AI wiring
   if (capital > 0) {
@@ -545,6 +534,58 @@ async function _fetchFundsAdvice({ capital, netProfit, winRate, avgDaily, totalD
     const btn = $("idFundsAiBtn");
     if (btn) btn.style.display = "";
   }
+}
+
+// ── Withdrawal Log Modal ──────────────────────────────────────────────────────
+function _showWithdrawLogModal() {
+  const modal = $("withdrawLogModal");
+  const body  = $("withdrawLogBody");
+  if (!modal || !body) return;
+  _renderWithdrawLogBody(body);
+  modal.classList.remove("hidden");
+}
+
+function _renderWithdrawLogBody(body) {
+  const wds = _getWds();
+  if (wds.length === 0) {
+    body.innerHTML = `<p class="wl-empty">No withdrawals logged yet.</p>`;
+    return;
+  }
+  const total = wds.reduce((s, w) => s + w.amount, 0);
+  body.innerHTML = `
+    <div class="wl-list">
+      ${wds.slice().reverse().map((w, i) => {
+        const realIdx = wds.length - 1 - i;
+        return `
+          <div class="wl-row">
+            <div class="wl-row-info">
+              <span class="wl-date">${w.date}</span>
+              <span class="wl-note">${w.note || "—"}</span>
+            </div>
+            <span class="wl-amt loss">${_fmt(w.amount)}</span>
+            <button class="wl-del-btn" data-idx="${realIdx}" title="Remove">✕</button>
+          </div>`;
+      }).join("")}
+    </div>
+    <div class="wl-total">
+      <span>Total (${wds.length} txn)</span>
+      <span class="loss">${_fmt(total)}</span>
+    </div>
+  `;
+  body.querySelectorAll(".wl-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.idx);
+      const arr = _getWds();
+      arr.splice(idx, 1);
+      localStorage.setItem(_wdKey(), JSON.stringify(arr));
+      _renderWithdrawLogBody(body);
+      _renderSummary();
+    });
+  });
+}
+
+function _closeWithdrawLogModal() {
+  $("withdrawLogModal")?.classList.add("hidden");
 }
 
 // ── Withdrawal ────────────────────────────────────────────────────────────────
@@ -827,6 +868,11 @@ function _bindEvents() {
   $("withdrawCancelBtn")?.addEventListener("click",  _closeWithdrawModal);
   $("withdrawConfirmBtn")?.addEventListener("click", _confirmWithdrawal);
   $("withdrawModal")?.addEventListener("click", (e) => { if (e.target === $("withdrawModal")) _closeWithdrawModal(); });
+
+  // Withdrawal log modal
+  $("withdrawLogCloseBtn")?.addEventListener("click", _closeWithdrawLogModal);
+  $("withdrawLogDoneBtn")?.addEventListener("click",  _closeWithdrawLogModal);
+  $("withdrawLogModal")?.addEventListener("click", (e) => { if (e.target === $("withdrawLogModal")) _closeWithdrawLogModal(); });
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────

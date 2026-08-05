@@ -20,11 +20,27 @@
   <div id="loginOverlay" class="login-overlay">
     <div class="login-box">
       <div class="login-logo">
-        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <line x1="5" y1="29" x2="5" y2="3" stroke-width="1.5" stroke-linecap="round" class="axis"/>
-          <line x1="3" y1="29" x2="31" y2="29" stroke-width="1.5" stroke-linecap="round" class="axis"/>
-          <polyline points="5,23 11,15 18,19 28,7" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
-          <circle cx="28" cy="7" r="2.5" class="dot"/>
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="nkLG1" x1="5" y1="90" x2="90" y2="8" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#00CCB4"/>
+              <stop offset="50%"  stop-color="#7AE040"/>
+              <stop offset="100%" stop-color="#EEFF00"/>
+            </linearGradient>
+          </defs>
+          <!-- Speed dots -->
+          <circle cx="3"   cy="84" r="2.2" fill="url(#nkLG1)" opacity="0.38"/>
+          <circle cx="6.5" cy="78" r="2.2" fill="url(#nkLG1)" opacity="0.60"/>
+          <circle cx="10"  cy="72" r="2.2" fill="url(#nkLG1)" opacity="0.82"/>
+          <!-- 3 ascending bars -->
+          <rect x="14" y="58" width="14" height="30" rx="2.5" fill="url(#nkLG1)"/>
+          <rect x="33" y="40" width="14" height="48" rx="2.5" fill="url(#nkLG1)"/>
+          <rect x="52" y="20" width="14" height="68" rx="2.5" fill="url(#nkLG1)"/>
+          <!-- W-zigzag sweep line (drawn on top of bars) -->
+          <path d="M 12,68 L 20,81 L 28,67 L 38,79 L 54,56 L 72,32 L 80,20"
+                stroke="url(#nkLG1)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Arrow head (solid triangle, tip upper-right) -->
+          <polygon points="90,8 87,27 73,17" fill="url(#nkLG1)"/>
         </svg>
       </div>
       <h2>Trade Tracker</h2>
@@ -43,11 +59,27 @@
     <header class="header">
       <div class="header-left">
         <div class="logo-icon">
-          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="3" y1="19" x2="3" y2="2" stroke-width="1.4" stroke-linecap="round" class="axis"/>
-            <line x1="2" y1="19" x2="20" y2="19" stroke-width="1.4" stroke-linecap="round" class="axis"/>
-            <polyline points="3,15 7,9 12,12 19,4" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="line"/>
-            <circle cx="19" cy="4" r="1.8" class="dot"/>
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="nkLG2" x1="5" y1="90" x2="90" y2="8" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stop-color="#00CCB4"/>
+                <stop offset="50%"  stop-color="#7AE040"/>
+                <stop offset="100%" stop-color="#EEFF00"/>
+              </linearGradient>
+            </defs>
+            <!-- Speed dots -->
+            <circle cx="3"   cy="84" r="2.2" fill="url(#nkLG2)" opacity="0.38"/>
+            <circle cx="6.5" cy="78" r="2.2" fill="url(#nkLG2)" opacity="0.60"/>
+            <circle cx="10"  cy="72" r="2.2" fill="url(#nkLG2)" opacity="0.82"/>
+            <!-- 3 ascending bars -->
+            <rect x="14" y="58" width="14" height="30" rx="2.5" fill="url(#nkLG2)"/>
+            <rect x="33" y="40" width="14" height="48" rx="2.5" fill="url(#nkLG2)"/>
+            <rect x="52" y="20" width="14" height="68" rx="2.5" fill="url(#nkLG2)"/>
+            <!-- W-zigzag sweep line (drawn on top of bars) -->
+            <path d="M 12,68 L 20,81 L 28,67 L 38,79 L 54,56 L 72,32 L 80,20"
+                  stroke="url(#nkLG2)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Arrow head (solid triangle, tip upper-right) -->
+            <polygon points="90,8 87,27 73,17" fill="url(#nkLG2)"/>
           </svg>
         </div>
         <div>
@@ -488,6 +520,20 @@
       <div class="modal-footer">
         <button class="btn-cancel" id="withdrawCancelBtn">Cancel</button>
         <button class="btn-primary" id="withdrawConfirmBtn">Log Withdrawal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Withdrawal Log Modal ─────────────────────────────────────────────── -->
+  <div id="withdrawLogModal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Withdrawal Log</h3>
+        <button class="modal-close" id="withdrawLogCloseBtn">✕</button>
+      </div>
+      <div class="modal-body wl-modal-body" id="withdrawLogBody"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="withdrawLogDoneBtn">Close</button>
       </div>
     </div>
   </div>
