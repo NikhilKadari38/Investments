@@ -2948,6 +2948,9 @@ a { color: var(--accent); text-decoration: none; }
 /* ── Widen right panel on part-time page only ── */
 #pttExpensePanel { width: 460px; }
 
+/* Prevent hero/form from shrinking inside the flex column — panel scrolls instead */
+#pttExpensePanel > * { flex-shrink: 0; }
+
 /* ── Bank Balance hero ── */
 .ptt-bal-hero {
   background: linear-gradient(135deg, #0A2218 0%, #143828 60%, #0A1E14 100%);
