@@ -1,8 +1,22 @@
 // ─── NK Trade Tracker — Stock Research & Analysis ─────────────────────────────
 
+import { db } from "./firebase-config.js";
+import {
+  collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  detectCandlePatterns, detectSwingSetup, detectRsiZone,
+  PATTERN_LABELS, SETUP_LABELS, RSI_ZONE_LABELS,
+  BULLISH_PATTERNS, BEARISH_PATTERNS
+} from "./patterns.js";
+
 const WORKER_URL = "https://nk-price-proxy.lotuswhite9392.workers.dev";
-let _trades = [];
+const WL_COL     = "nktt_watchlist";
+const SIG_COL    = "nktt_signals";
+
+let _trades      = [];
 let _currentFund = "zerodha";
+let _watchlist   = [];   // [{ id, symbol, notes, addedDate }]
 
 export function initResearch(trades, fund) {
   _trades = trades || [];
@@ -13,6 +27,9 @@ export function initResearch(trades, fund) {
   btn.addEventListener("click", () => _analyze(input.value.trim()));
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") _analyze(input.value.trim()); });
   _renderSuggestions();
+  _loadWatchlist();
+  _loadSignals();
+  _bindWatchlistEvents();
 
   document.addEventListener("research-reset", () => _renderSuggestions());
 }
@@ -91,7 +108,12 @@ async function _analyze(symbol) {
     const current    = await _fetchCurrent(symbol);
     const historical = await _fetchHistorical(symbol);
     const technicals = historical ? _calcTechnicals(historical, current.regularMarketPrice) : null;
-    _render(symbol, current, historical, technicals);
+    const patternData = historical ? {
+      patterns: detectCandlePatterns(historical),
+      setup:    detectSwingSetup(historical, technicals),
+      rsiZone:  detectRsiZone(technicals?.rsi14),
+    } : null;
+    _render(symbol, current, historical, technicals, patternData);
   } catch {
     container.classList.remove("has-results");
     results.innerHTML = '<div class="res-error">Could not find data for <strong>' + symbol + '</strong>. Check the symbol and try again.</div>';
@@ -150,7 +172,7 @@ function _fmtVol(n) { if (!n) return "–"; if (n >= 1e7) return (n / 1e7).toFix
 function _fmtShort(n) { if (n >= 100000) return "₹" + (n / 100000).toFixed(n % 100000 === 0 ? 0 : 1) + "L"; return "₹" + n.toLocaleString("en-IN"); }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
-function _render(symbol, current, hist, tech) {
+function _render(symbol, current, hist, tech, pd) {
   const el = document.getElementById("researchResults");
   document.querySelector(".research-container").classList.add("has-results");
 
@@ -198,6 +220,32 @@ function _render(symbol, current, hist, tech) {
 
   // AI Analysis
   h += _gsItem(12, 36, '<div class="res-ai-section"><div class="res-ai-header"><div class="res-block-title">AI Analysis</div><span class="res-ai-status" id="resAiStatus">analyzing...</span></div><div class="res-ai-body" id="resAiBody"><div class="res-ai-loading"><div class="res-spinner"></div>Tara is analyzing ' + symbol + '...</div></div></div>');
+
+  // Pattern Detection
+  if (pd) {
+    const pillsHtml = pd.patterns.length > 0
+      ? pd.patterns.map(p => {
+          const cls = BULLISH_PATTERNS.has(p) ? "profit" : BEARISH_PATTERNS.has(p) ? "loss" : "neutral";
+          return '<span class="res-pattern-pill ' + cls + '">' + (PATTERN_LABELS[p] || p) + '</span>';
+        }).join("")
+      : '<span class="res-pattern-none">No pattern detected today</span>';
+
+    const setupHtml = pd.setup
+      ? '<span class="res-k">Setup</span><span class="res-pattern-setup profit">' + (SETUP_LABELS[pd.setup] || pd.setup) + '</span>'
+      : '<span class="res-k">Setup</span><span style="color:var(--text-3)">None</span>';
+
+    const rsiCls  = pd.rsiZone === "oversold" || pd.rsiZone === "pullback_zone" ? "profit" : pd.rsiZone === "overbought" ? "loss" : "";
+    const rsiHtml = '<span class="res-k">RSI Zone</span><span class="' + rsiCls + '">' + (RSI_ZONE_LABELS[pd.rsiZone] || pd.rsiZone) + '</span>';
+
+    h += _gsItem(12, 20,
+      '<div class="res-block res-pattern-block">' +
+        '<div class="res-block-title">Pattern Detection</div>' +
+        '<div class="res-pattern-pills">' + pillsHtml + '</div>' +
+        '<div class="res-pattern-meta">' + setupHtml + '</div>' +
+        '<div class="res-pattern-meta">' + rsiHtml + '</div>' +
+      '</div>'
+    );
+  }
 
   // Simulator
   const amounts = [25000, 50000, 75000, 100000, 150000, 200000];
@@ -302,11 +350,11 @@ function _render(symbol, current, hist, tech) {
   _saveAnalysisHistory(symbol, current, tech);
 
   // Auto-run AI analysis
-  _askAI(symbol, current, tech);
+  _askAI(symbol, current, tech, pd);
 }
 
 // ─── AI Analysis ──────────────────────────────────────────────────────────────
-async function _askAI(symbol, current, tech) {
+async function _askAI(symbol, current, tech, pd) {
   const body = document.getElementById("resAiBody"), status = document.getElementById("resAiStatus");
   if (!body) return;
   if (status) status.textContent = "analyzing...";
@@ -315,6 +363,11 @@ async function _askAI(symbol, current, tech) {
   const chgP = ((price - prev) / prev * 100).toFixed(2);
   let d = symbol + " on NSE\nPrice: ₹" + price + " (" + (chgP >= 0 ? "+" : "") + chgP + "%)\n52W: ₹" + current.fiftyTwoWeekLow + " - ₹" + current.fiftyTwoWeekHigh + "\nVol: " + current.regularMarketVolume + "\n";
   if (tech) d += "RSI: " + tech.rsi14 + "\nMACD: " + (tech.macd?.value ?? "-") + " (" + (tech.macd?.signal ?? "-") + ")\n20EMA: ₹" + tech.ema20 + " (" + (price > tech.ema20 ? "above" : "below") + ")\n50DMA: ₹" + tech.sma50 + "\n200DMA: ₹" + tech.sma200 + "\nSupport: ₹" + tech.support + " Resistance: ₹" + tech.resistance + "\n10d Mom: " + (tech.momentum?.d10 ?? "-") + "%\n20d Mom: " + (tech.momentum?.d20 ?? "-") + "%\n";
+  if (pd) {
+    if (pd.patterns.length > 0) d += "Candlestick patterns: " + pd.patterns.map(p => PATTERN_LABELS[p] || p).join(", ") + "\n";
+    if (pd.setup)                d += "Swing setup: " + (SETUP_LABELS[pd.setup] || pd.setup) + "\n";
+    if (pd.rsiZone !== "neutral") d += "RSI zone: " + (RSI_ZONE_LABELS[pd.rsiZone] || pd.rsiZone) + "\n";
+  }
   const inP = _trades.filter(t => t.symbol === symbol && t.status === "open");
   if (inP.length > 0) { const ti = inP.reduce((s, t) => s + t.investedAmount, 0), tc = inP.reduce((s, t) => s + (t.livePrice ? t.livePrice * t.shares : t.investedAmount), 0); d += "\nHOLDING: Inv ₹" + ti.toFixed(0) + " Cur ₹" + tc.toFixed(0) + " P/L " + ((tc - ti) / ti * 100).toFixed(1) + "%\n"; }
   const prompt = d + "\nYou are advising a trader who primarily does swing trades but may hold longer if the setup is strong. Respond in EXACTLY this structured format — no intro, no disclaimer, no extra text:\n\nVERDICT: [BUY / HOLD / AVOID] — [one line reason]\nTIMING: [Buy now / Wait for dip to ₹X / Wait for breakout above ₹X] — [why this timing]\nENTRY: ₹[low] – ₹[high]\nSTOP LOSS: ₹[price] ([X]% from entry)\nTARGET 1: ₹[price] ([X]% upside) in [timeframe]\nTARGET 2: ₹[price] ([X]% upside) if held longer\nRISK: [Low/Medium/High] — [one line why]\nCONFIDENCE: [Low/Medium/High]\n\nKEY FACTORS:\n- [factor 1]\n- [factor 2]\n- [factor 3]";
@@ -502,6 +555,201 @@ function _getSignalText(tech, price) {
   if (bull >= 3) return "NEUTRAL";
   if (bull >= 2) return "SELL";
   return "STRONG SELL";
+}
+
+// ─── Watchlist ────────────────────────────────────────────────────────────────
+let _wlEventsReady = false;
+function _bindWatchlistEvents() {
+  if (_wlEventsReady) return;
+  _wlEventsReady = true;
+  document.getElementById("wlAddBtn")?.addEventListener("click", _addWlSymbol);
+  document.getElementById("wlSymInput")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") _addWlSymbol();
+  });
+}
+
+async function _loadWatchlist() {
+  const el = document.getElementById("wlItemList");
+  if (el) el.innerHTML = '<div class="wl-state">Loading...</div>';
+  try {
+    const snap = await getDocs(collection(db, WL_COL));
+    _watchlist = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _watchlist.sort((a, b) => (b.addedDate || "").localeCompare(a.addedDate || ""));
+    _renderWatchlist();
+    _updateWlCount();
+  } catch {
+    if (el) el.innerHTML = '<div class="wl-state wl-error">Could not load watchlist.</div>';
+  }
+}
+
+async function _addWlSymbol() {
+  const symEl  = document.getElementById("wlSymInput");
+  const noteEl = document.getElementById("wlNoteInput");
+  const sym    = (symEl?.value.trim().toUpperCase() || "").replace(/\.NS$|\.BO$/, "");
+  if (!sym) return;
+  if (_watchlist.find(w => w.symbol === sym)) { _wlToast(sym + " already in watchlist"); return; }
+
+  const btn = document.getElementById("wlAddBtn");
+  if (btn) { btn.textContent = "Adding..."; btn.disabled = true; }
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const data  = { symbol: sym, notes: noteEl?.value.trim() || "", addedDate: today, active: true, createdAt: serverTimestamp() };
+    const ref   = await addDoc(collection(db, WL_COL), data);
+    _watchlist.unshift({ id: ref.id, ...data });
+    if (symEl)  symEl.value  = "";
+    if (noteEl) noteEl.value = "";
+    _renderWatchlist();
+    _updateWlCount();
+    _wlToast(sym + " added to watchlist");
+  } catch { _wlToast("Could not add symbol", true); }
+  finally  { if (btn) { btn.textContent = "Add"; btn.disabled = false; } }
+}
+
+async function _removeWlSymbol(id) {
+  try {
+    await deleteDoc(doc(db, WL_COL, id));
+    _watchlist = _watchlist.filter(w => w.id !== id);
+    _renderWatchlist();
+    _updateWlCount();
+  } catch { _wlToast("Could not remove", true); }
+}
+
+function _renderWatchlist() {
+  const el = document.getElementById("wlItemList");
+  if (!el) return;
+  if (_watchlist.length === 0) {
+    el.innerHTML = '<div class="wl-state">No symbols yet — add one above to start tracking.</div>';
+    return;
+  }
+  el.innerHTML = _watchlist.map(w => `
+    <div class="wl-item">
+      <div class="wl-item-left">
+        <div class="wl-item-sym">${w.symbol}</div>
+        ${w.notes ? `<div class="wl-item-note">${w.notes}</div>` : ""}
+        <div class="wl-item-date">Added ${w.addedDate || "—"}</div>
+      </div>
+      <div class="wl-item-actions">
+        <button class="wl-analyze-btn" data-symbol="${w.symbol}">Analyze</button>
+        <button class="wl-remove-btn" data-id="${w.id}" title="Remove">✕</button>
+      </div>
+    </div>`).join("");
+
+  el.querySelectorAll(".wl-analyze-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const inp = document.getElementById("researchSymbol");
+      if (inp) inp.value = btn.dataset.symbol;
+      _analyze(btn.dataset.symbol);
+    });
+  });
+
+  el.querySelectorAll(".wl-remove-btn").forEach(btn => {
+    btn.addEventListener("click", () => _removeWlSymbol(btn.dataset.id));
+  });
+}
+
+function _updateWlCount() {
+  const el = document.getElementById("wlCount");
+  if (!el) return;
+  if (_watchlist.length > 0) {
+    el.textContent = _watchlist.length + " symbol" + (_watchlist.length !== 1 ? "s" : "");
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
+}
+
+function _wlToast(msg, isError = false) {
+  let wrap = document.querySelector(".toast-wrap");
+  if (!wrap) { wrap = document.createElement("div"); wrap.className = "toast-wrap"; document.body.appendChild(wrap); }
+  const t = document.createElement("div");
+  t.className   = "toast " + (isError ? "error" : "success");
+  t.textContent = msg;
+  wrap.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("visible")));
+  setTimeout(() => { t.classList.remove("visible"); setTimeout(() => t.remove(), 280); }, 2600);
+}
+
+// ─── Signals Panel ────────────────────────────────────────────────────────────
+
+async function _loadSignals() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const q     = query(collection(db, SIG_COL), where("date", "==", today));
+    const snap  = await getDocs(q);
+    const sigs  = snap.docs.map(d => d.data());
+    _renderSignals(sigs, today);
+  } catch { /* signals unavailable — fail silently */ }
+}
+
+function _renderSignals(sigs, today) {
+  const section  = document.getElementById("signalsSection");
+  const list     = document.getElementById("signalsList");
+  const dateEl   = document.getElementById("signalsDate");
+  const badge    = document.getElementById("signalsBadge");
+  if (!section || !list) return;
+
+  const flagged = sigs.filter(s => s.patterns?.length > 0 || s.setup);
+
+  // Update nav badge
+  if (badge) {
+    if (flagged.length > 0) {
+      badge.textContent = flagged.length;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  }
+
+  if (sigs.length === 0) { section.classList.add("hidden"); return; }
+
+  section.classList.remove("hidden");
+  if (dateEl) dateEl.textContent = new Date(today).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+  if (flagged.length === 0) {
+    list.innerHTML = '<div class="sig-empty">Scanned ' + sigs.length + ' symbol' + (sigs.length !== 1 ? "s" : "") + ' — no patterns detected today.</div>';
+    return;
+  }
+
+  list.innerHTML = flagged.map(s => {
+    const pillsHtml = (s.patterns || []).map(p => {
+      const cls = BULLISH_PATTERNS.has(p) ? "profit" : BEARISH_PATTERNS.has(p) ? "loss" : "neutral";
+      return '<span class="sig-pill ' + cls + '">' + (PATTERN_LABELS[p] || p) + '</span>';
+    }).join("");
+
+    const setupHtml = s.setup
+      ? '<span class="sig-meta-tag profit">' + (s.setup === "breakout_volume" ? "Breakout + Vol" : "Trend Pullback") + '</span>'
+      : "";
+
+    const rsiCls = s.rsiZone === "oversold" || s.rsiZone === "pullback_zone" ? "profit"
+                 : s.rsiZone === "overbought" ? "loss" : "";
+    const rsiLabel = { overbought: "Overbought", oversold: "Oversold", pullback_zone: "Pullback Zone", neutral: "Neutral" }[s.rsiZone] || s.rsiZone;
+
+    const analysisHtml = s.analysis
+      ? '<div class="sig-analysis">' + s.analysis + '</div>'
+      : "";
+
+    return '<div class="sig-card">' +
+      '<div class="sig-card-top">' +
+        '<span class="sig-sym">' + s.symbol + '</span>' +
+        '<span class="sig-price">' + _fmt(s.price) + '</span>' +
+      '</div>' +
+      '<div class="sig-pills">' + pillsHtml + setupHtml + '</div>' +
+      '<div class="sig-meta-row">' +
+        '<span class="sig-meta-item ' + rsiCls + '">RSI ' + (s.rsi || "—") + ' · ' + rsiLabel + '</span>' +
+        (s.ema20 ? '<span class="sig-meta-item">EMA20 ' + _fmt(s.ema20) + '</span>' : '') +
+      '</div>' +
+      analysisHtml +
+      '<button class="sig-analyze-btn" data-symbol="' + s.symbol + '">Full Analysis →</button>' +
+    '</div>';
+  }).join("");
+
+  list.querySelectorAll(".sig-analyze-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const inp = document.getElementById("researchSymbol");
+      if (inp) inp.value = btn.dataset.symbol;
+      _analyze(btn.dataset.symbol);
+    });
+  });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

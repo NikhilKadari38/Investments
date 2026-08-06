@@ -90,7 +90,7 @@
       <nav class="nav">
         <a class="nav-link active" data-page="portfolio">Swing</a>
         <a class="nav-link" data-page="intraday">Intraday</a>
-        <a class="nav-link" data-page="research">Research</a>
+        <a class="nav-link" data-page="research">Research<span class="sig-nav-badge hidden" id="signalsBadge"></span></a>
         <a class="nav-link" data-page="parttime">Part-Time</a>
         <a class="nav-link" data-page="networth">Net Worth</a>
       </nav>
@@ -310,19 +310,47 @@
 
     <!-- Research Page -->
     <main id="page-research" class="research-page hidden">
-      <div class="research-container">
-        <h1 class="section-title">Research</h1>
-        <div class="res-search">
-          <input type="text" id="researchSymbol" placeholder="Enter stock symbol (e.g. RELIANCE)" autocomplete="off" spellcheck="false" />
-          <button id="researchBtn" class="btn-primary res-btn">Analyze</button>
-        </div>
-        <div id="researchResults" class="res-results">
-          <div class="res-empty">
-            <div class="res-empty-icon">📊</div>
-            <div class="res-empty-text">Enter a stock symbol to analyze</div>
-            <div class="res-empty-sub">Get RSI, MACD, momentum, volume analysis & overall signal</div>
+      <div class="research-split">
+
+        <!-- Left: Analyze -->
+        <section class="research-container res-left">
+          <h1 class="section-title">Research</h1>
+          <div class="res-search">
+            <input type="text" id="researchSymbol" placeholder="Enter stock symbol (e.g. RELIANCE)" autocomplete="off" spellcheck="false" />
+            <button id="researchBtn" class="btn-primary res-btn">Analyze</button>
           </div>
-        </div>
+          <div id="researchResults" class="res-results">
+            <div class="res-empty">
+              <div class="res-empty-icon">📊</div>
+              <div class="res-empty-text">Enter a stock symbol to analyze</div>
+              <div class="res-empty-sub">Get RSI, MACD, momentum, volume analysis & overall signal</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: Watchlist -->
+        <aside class="res-right">
+          <div class="res-right-head">
+            <span class="res-right-title">Watchlist</span>
+            <span class="res-right-count hidden" id="wlCount">0 symbols</span>
+          </div>
+          <div class="wl-add-row">
+            <input id="wlSymInput" type="text" placeholder="Symbol (e.g. RELIANCE)" autocomplete="off" spellcheck="false" />
+            <input id="wlNoteInput" type="text" placeholder="Note (optional)" autocomplete="off" />
+            <button id="wlAddBtn" class="btn-primary">Add</button>
+          </div>
+          <div id="wlItemList" class="wl-item-list"></div>
+
+          <!-- Signals panel — populated by scanner cron -->
+          <div id="signalsSection" class="sig-section hidden">
+            <div class="sig-section-head">
+              <span class="sig-section-title">Today's Signals</span>
+              <span class="sig-section-date" id="signalsDate"></span>
+            </div>
+            <div id="signalsList"></div>
+          </div>
+        </aside>
+
       </div>
     </main>
 

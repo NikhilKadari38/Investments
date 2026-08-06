@@ -770,14 +770,10 @@ a { color: var(--accent); text-decoration: none; }
   .intraday-log { padding: 12px 14px 20px; }
 
   /* ─── Research page ──────────────────────────────────────────────────────── */
-  .research-page {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    height: 0;
-    padding: 16px 14px calc(65px + env(safe-area-inset-bottom, 0px) + 16px);
-    width: 100%;
-  }
+  .research-page { overflow-y: auto; height: auto; display: block; }
+  .research-split { flex-direction: column; overflow: visible; }
+  .res-left  { overflow: visible; border-right: none; border-bottom: 1px solid var(--card-border); padding: 16px 14px 20px; }
+  .res-right { overflow: visible; padding: 16px 14px calc(65px + env(safe-area-inset-bottom, 0px) + 16px); }
 
   /* ─── Login ──────────────────────────────────────────────────────────────── */
   .login-overlay { align-items: center; padding: 20px; }
@@ -1067,15 +1063,62 @@ a { color: var(--accent); text-decoration: none; }
    RESEARCH PAGE — Full-width dashboard
 ───────────────────────────────────────────────────────────────────────────── */
 .research-page {
-  flex: 1; overflow-y: auto; padding: 35px 20px 20px;
+  flex: 1; overflow: hidden;
   background: var(--bg);
+  display: flex;
 }
-.research-container { max-width: 100%; }
-.research-container .section-title { text-align: center; }
 
-/* has-results: hide original search + title */
+.research-split {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Left: Analyze */
+.res-left {
+  flex: 3;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 35px 24px 20px;
+  border-right: 1px solid var(--card-border);
+}
+.res-left .section-title { text-align: center; }
+.res-left.has-results .section-title { display: none; }
+.res-left.has-results .res-search    { display: none; }
+
+/* Right: Watchlist */
+.res-right {
+  flex: 0 0 380px;
+  width: 380px;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 28px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.res-right-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.res-right-title {
+  font-family: var(--ff-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.res-right-count {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--ff-mono);
+}
+.res-right-count.hidden { display: none; }
+
+/* keep old research-container compat for has-results via .res-left alias */
 .research-container.has-results .section-title { display: none; }
-.research-container.has-results .res-search { display: none; }
+.research-container.has-results .res-search    { display: none; }
 
 /* Search bar */
 .res-search {
@@ -1140,6 +1183,48 @@ a { color: var(--accent); text-decoration: none; }
 }
 .res-sug-pl.profit { color: var(--profit); }
 .res-sug-pl.loss   { color: var(--loss); }
+
+/* ── Pattern Detection block ── */
+.res-pattern-block { display: flex; flex-direction: column; gap: 10px; }
+
+.res-pattern-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.res-pattern-pill {
+  font-size: 12px;
+  font-family: var(--ff-ui);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+.res-pattern-pill.profit  { color: var(--profit); background: rgba(74,222,128,0.08); }
+.res-pattern-pill.loss    { color: var(--loss);   background: rgba(248,113,113,0.08); }
+.res-pattern-pill.neutral { color: var(--text-2); background: var(--surface); }
+
+.res-pattern-none {
+  font-size: 12px;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.res-pattern-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.res-pattern-setup {
+  font-family: var(--ff-ui);
+  font-weight: 600;
+  font-size: 13px;
+}
 
 /* ── Track Record ── */
 .track-record-section { margin-top: 8px; }
@@ -2349,6 +2434,270 @@ a { color: var(--accent); text-decoration: none; }
   transition: opacity var(--tx);
 }
 .id-funds-ai-btn:hover { opacity: .8; }
+
+/* ══ Research — Watchlist (right panel) ════════════════════════════════════ */
+
+/* Watchlist add row */
+.wl-add-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 14px;
+}
+.wl-add-row input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  color: var(--text-1);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-family: var(--ff-ui);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.wl-add-row input:focus { border-color: var(--text-2); }
+.wl-add-row input::placeholder { color: var(--text-3); }
+.wl-add-row .btn-primary { align-self: flex-end; }
+
+/* Watchlist item list */
+.wl-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.wl-item:hover {
+  border-color: var(--text-3);
+  box-shadow: var(--card-shadow);
+}
+
+.wl-item-left { flex: 1; min-width: 0; }
+
+.wl-item-sym {
+  font-family: var(--ff-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.02em;
+}
+.wl-item-note {
+  font-size: 12px;
+  color: var(--text-2);
+  font-family: var(--ff-ui);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wl-item-date {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--ff-mono);
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.wl-item-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+.wl-analyze-btn {
+  background: none;
+  border: 1px solid var(--card-border);
+  color: var(--text-1);
+  font-size: 12px;
+  font-family: var(--ff-ui);
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.wl-analyze-btn:hover {
+  background: var(--text-1);
+  border-color: var(--text-1);
+  color: var(--bg);
+}
+
+.wl-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 7px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.wl-remove-btn:hover { color: var(--loss); background: rgba(248,113,113,0.10); }
+
+.wl-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+  font-size: 14px;
+  font-family: var(--ff-ui);
+}
+.wl-error { color: var(--loss); }
+
+/* ── Signals Panel ── */
+.sig-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--card-border);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sig-section.hidden { display: none; }
+
+.sig-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.sig-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  font-family: var(--ff-ui);
+}
+.sig-section-date {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--ff-ui);
+}
+
+.sig-card {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sig-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.sig-sym {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-family: var(--ff-display);
+  letter-spacing: 0.02em;
+}
+.sig-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-family: var(--ff-mono);
+}
+.sig-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sig-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: var(--ff-ui);
+}
+.sig-pill.profit { background: rgba(40,200,128,0.12); color: var(--profit); }
+.sig-pill.loss   { background: rgba(248,113,113,0.12); color: var(--loss); }
+.sig-pill.neutral { background: rgba(148,163,184,0.12); color: var(--text-2); }
+
+.sig-meta-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: var(--ff-ui);
+  border: 1px solid currentColor;
+}
+.sig-meta-tag.profit { color: var(--profit); }
+
+.sig-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sig-meta-item {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--ff-ui);
+}
+.sig-meta-item.profit { color: var(--profit); }
+.sig-meta-item.loss   { color: var(--loss); }
+
+.sig-analysis {
+  font-size: 12px;
+  color: var(--text-2);
+  font-family: var(--ff-ui);
+  line-height: 1.55;
+  border-left: 2px solid var(--card-border);
+  padding-left: 10px;
+  margin-top: 2px;
+}
+
+.sig-analyze-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  font-family: var(--ff-ui);
+  transition: color 0.15s;
+}
+.sig-analyze-btn:hover { color: var(--text-1); }
+
+.sig-empty {
+  font-size: 13px;
+  color: var(--text-3);
+  font-family: var(--ff-ui);
+  padding: 12px 4px;
+  text-align: center;
+}
+
+/* Nav badge for signals count */
+.sig-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--profit);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+  font-family: var(--ff-ui);
+}
+.sig-nav-badge.hidden { display: none; }
 
 /* ══ Part-Time & Expenses ══════════════════════════════════════════════════ */
 
