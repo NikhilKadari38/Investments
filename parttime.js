@@ -1,19 +1,28 @@
 // ─── NK Trade Tracker — Part-Time & Expenses Module ─────────────────────────
 
-const PTT_HOURS_KEY    = "ptt_hours_v1";
-const PTT_RATE_KEY     = "ptt_rate_v1";
-const PTT_SALARY_KEY   = "ptt_salary_v1";
-const PTT_TX_KEY       = "ptt_transactions_v1"; // [{ id, date, type, category, amount }]
-const PTT_BANK_KEY     = "ptt_bank_init_v1";    // number — opening balance
+import { db } from "./firebase-config.js";
+import {
+  collection, getDocs, doc, getDoc, setDoc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Legacy localStorage keys (used only for one-time migration)
+const PTT_HOURS_KEY  = "ptt_hours_v1";
+const PTT_RATE_KEY   = "ptt_rate_v1";
+const PTT_SALARY_KEY = "ptt_salary_v1";
+const PTT_TX_KEY     = "ptt_transactions_v1";
+const PTT_BANK_KEY   = "ptt_bank_init_v1";
 
 const MONTHS = ["January","February","March","April","May","June",
                 "July","August","September","October","November","December"];
 const DOW    = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+// ── In-memory state (synced from Firestore) ───────────────────────────────────
+let _state = { rate: 14, bankInit: 0, hours: {}, salaries: {}, txs: [] };
 let _pttYear  = new Date().getFullYear();
 let _pttMonth = new Date().getMonth();
 let _pttInit  = false;
-let _txType   = "expense"; // active form type
+let _txType   = "expense";
+let _settingsTimer = null;
 
 const _$       = (id)    => document.getElementById(id);
 const _pad     = (n)     => String(n).padStart(2, "0");
@@ -24,28 +33,97 @@ const _monKey  = (y,m)   => `${y}-${_pad(m+1)}`;
 function _fmtE(v) {
   return "€" + Number(v).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function _fmtDate(iso) {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
 
-function _getHours()    { try { return JSON.parse(localStorage.getItem(PTT_HOURS_KEY)  || "{}"); } catch { return {}; } }
-function _getSalaries() { try { return JSON.parse(localStorage.getItem(PTT_SALARY_KEY)|| "{}"); } catch { return {}; } }
-function _getTxs()      { try { return JSON.parse(localStorage.getItem(PTT_TX_KEY)    || "[]"); } catch { return []; } }
-function _getRate()     { const v = parseFloat(localStorage.getItem(PTT_RATE_KEY)); return isNaN(v) ? 14 : v; }
-function _getInitBal()  { return parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0"); }
+// ── State readers (replace localStorage reads) ────────────────────────────────
+function _getHours()   { return _state.hours; }
+function _getSalaries(){ return _state.salaries; }
+function _getTxs()     { return _state.txs; }
+function _getRate()    { return _state.rate; }
+function _getInitBal() { return _state.bankInit; }
 function _calcBalance(txs) {
   return txs.reduce((bal, t) => t.type === "income" ? bal + t.amount : bal - t.amount, _getInitBal());
 }
 
+// ── Firestore helpers ─────────────────────────────────────────────────────────
+async function _saveSettings() {
+  try {
+    await setDoc(doc(db, "nktt_parttime", "settings"), {
+      rate:     _state.rate,
+      bankInit: _state.bankInit,
+      hours:    _state.hours,
+      salaries: _state.salaries
+    });
+  } catch (e) { console.error("ptt settings save:", e); }
+}
+
+function _saveSettingsDebounced() {
+  clearTimeout(_settingsTimer);
+  _settingsTimer = setTimeout(_saveSettings, 800);
+}
+
+// ── Load from Firestore (with localStorage migration) ─────────────────────────
+async function _loadFromFirestore() {
+  try {
+    const snap = await getDoc(doc(db, "nktt_parttime", "settings"));
+    if (snap.exists()) {
+      const d = snap.data();
+      _state.rate     = d.rate     ?? 14;
+      _state.bankInit = d.bankInit ?? 0;
+      _state.hours    = d.hours    ?? {};
+      _state.salaries = d.salaries ?? {};
+    } else {
+      // One-time migration from localStorage
+      const r = parseFloat(localStorage.getItem(PTT_RATE_KEY));
+      _state.rate     = isNaN(r) ? 14 : r;
+      _state.bankInit = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0") || 0;
+      try { _state.hours    = JSON.parse(localStorage.getItem(PTT_HOURS_KEY)  || "{}"); } catch { _state.hours    = {}; }
+      try { _state.salaries = JSON.parse(localStorage.getItem(PTT_SALARY_KEY) || "{}"); } catch { _state.salaries = {}; }
+      await _saveSettings();
+    }
+
+    // Load transactions
+    const txSnap = await getDocs(collection(db, "nktt_ptt_tx"));
+    if (txSnap.empty) {
+      // One-time migration of transactions from localStorage
+      try {
+        const local = JSON.parse(localStorage.getItem(PTT_TX_KEY) || "[]");
+        for (const tx of local) {
+          await setDoc(doc(db, "nktt_ptt_tx", tx.id), {
+            id: tx.id, date: tx.date, type: tx.type, category: tx.category, amount: tx.amount
+          });
+          _state.txs.push(tx);
+        }
+      } catch { _state.txs = []; }
+    } else {
+      _state.txs = txSnap.docs.map(d => d.data());
+    }
+  } catch (e) {
+    console.error("ptt load from Firestore:", e);
+    // Fallback to localStorage if Firestore is unavailable
+    try { _state.hours    = JSON.parse(localStorage.getItem(PTT_HOURS_KEY)  || "{}"); } catch { _state.hours    = {}; }
+    try { _state.salaries = JSON.parse(localStorage.getItem(PTT_SALARY_KEY) || "{}"); } catch { _state.salaries = {}; }
+    try { _state.txs      = JSON.parse(localStorage.getItem(PTT_TX_KEY)     || "[]"); } catch { _state.txs      = []; }
+    const r = parseFloat(localStorage.getItem(PTT_RATE_KEY));
+    _state.rate     = isNaN(r) ? 14 : r;
+    _state.bankInit = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0") || 0;
+  }
+}
+
 // ── Entry Point ───────────────────────────────────────────────────────────────
-export function initParttime() {
+export async function initParttime() {
+  if (!_pttInit) {
+    _pttInit = true;
+    // Show loading while Firestore loads
+    const aside = _$("pttExpensePanel");
+    if (aside) aside.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-family:var(--ff-ui)">Loading…</div>`;
+    await _loadFromFirestore();
+    _bindPttEvents();
+  }
   _renderAll();
-  if (_pttInit) return;
-  _pttInit = true;
-  if (localStorage.getItem(PTT_RATE_KEY) === null) localStorage.setItem(PTT_RATE_KEY, "14");
-  _bindPttEvents();
 }
 
 function _renderAll() {
@@ -73,19 +151,19 @@ function _renderSettingsBar() {
 
   _$("pttRateInput").addEventListener("input", () => {
     const v = parseFloat(_$("pttRateInput").value);
-    localStorage.setItem(PTT_RATE_KEY, isNaN(v) ? 14 : v);
+    _state.rate = isNaN(v) ? 14 : v;
     _renderCalendar();
     _recalcSummary();
     _renderHistory();
+    _saveSettings();
   });
 
   _$("pttSalaryInput").addEventListener("input", () => {
-    const v    = parseFloat(_$("pttSalaryInput").value);
-    const sals = _getSalaries();
-    sals[_monKey(_pttYear, _pttMonth)] = isNaN(v) ? 0 : v;
-    localStorage.setItem(PTT_SALARY_KEY, JSON.stringify(sals));
+    const v = parseFloat(_$("pttSalaryInput").value);
+    _state.salaries[_monKey(_pttYear, _pttMonth)] = isNaN(v) ? 0 : v;
     _recalcSummary();
     _renderHistory();
+    _saveSettings();
   });
 }
 
@@ -98,11 +176,9 @@ function _renderCalendar() {
   const hoursData   = _getHours();
   const daysInMonth = new Date(_pttYear, _pttMonth + 1, 0).getDate();
   const firstDay    = new Date(_pttYear, _pttMonth, 1).getDay();
-  const startOffset = (firstDay + 6) % 7; // Mon=0
+  const startOffset = (firstDay + 6) % 7;
   const todayStr    = _today();
-  const mk          = _monKey(_pttYear, _pttMonth);
 
-  // Nav + grid wrapper
   wrap.innerHTML = `
     <div class="ptt-cal-nav">
       <button class="ptt-nav-btn" id="pttPrevMonth">&#8592;</button>
@@ -115,7 +191,6 @@ function _renderCalendar() {
 
   const grid = _$("pttCalGrid");
 
-  // Day-of-week headers
   DOW.forEach((d, i) => {
     const el = document.createElement("div");
     el.className = "ptt-dow" + (i >= 5 ? " ptt-dow-wknd" : "");
@@ -123,14 +198,12 @@ function _renderCalendar() {
     grid.appendChild(el);
   });
 
-  // Empty cells before 1st
   for (let i = 0; i < startOffset; i++) {
     const el = document.createElement("div");
     el.className = "ptt-day ptt-day-empty";
     grid.appendChild(el);
   }
 
-  // Day cells
   for (let d = 1; d <= daysInMonth; d++) {
     const key    = _dateKey(_pttYear, _pttMonth, d);
     const col    = (startOffset + d - 1) % 7;
@@ -140,16 +213,14 @@ function _renderCalendar() {
 
     const cell = document.createElement("div");
     cell.className = "ptt-day" +
-      (isWknd        ? " ptt-day-wknd"  : "") +
-      (key===todayStr? " ptt-day-today" : "");
+      (isWknd         ? " ptt-day-wknd"  : "") +
+      (key===todayStr ? " ptt-day-today" : "");
 
-    // Day number
     const num = document.createElement("div");
-    num.className = "ptt-day-num";
+    num.className   = "ptt-day-num";
     num.textContent = d;
     cell.appendChild(num);
 
-    // Hours input
     const input = document.createElement("input");
     input.className   = "ptt-hrs-inp";
     input.type        = "number";
@@ -160,26 +231,23 @@ function _renderCalendar() {
     if (h > 0) input.value = h;
     cell.appendChild(input);
 
-    // Earnings label
     const earn = document.createElement("div");
-    earn.className = "ptt-day-earn";
+    earn.className  = "ptt-day-earn";
     earn.textContent = h > 0 ? _fmtE(h * rate) : "";
     cell.appendChild(earn);
 
     input.addEventListener("input", () => {
-      const val  = parseFloat(input.value);
-      const data = _getHours();
-      if (isNaN(val) || val <= 0) { delete data[key]; earn.textContent = ""; }
-      else { data[key] = val; earn.textContent = _fmtE(val * rate); }
-      localStorage.setItem(PTT_HOURS_KEY, JSON.stringify(data));
+      const val = parseFloat(input.value);
+      if (isNaN(val) || val <= 0) { delete _state.hours[key]; earn.textContent = ""; }
+      else { _state.hours[key] = val; earn.textContent = _fmtE(val * rate); }
       _recalcSummary();
       _renderHistory();
+      _saveSettingsDebounced();
     });
 
     grid.appendChild(cell);
   }
 
-  // Month nav
   _$("pttPrevMonth").addEventListener("click", () => {
     _pttMonth--;
     if (_pttMonth < 0) { _pttMonth = 11; _pttYear--; }
@@ -196,7 +264,7 @@ function _renderCalendar() {
   });
 }
 
-// ── Summary (recalc only, no full re-render) ──────────────────────────────────
+// ── Summary ───────────────────────────────────────────────────────────────────
 function _recalcSummary() {
   const hoursData = _getHours();
   const rate      = _getRate();
@@ -227,7 +295,7 @@ function _recalcSummary() {
       </div>
       <div class="ptt-sum-card">
         <span class="ptt-sum-label">VS. Salary</span>
-        <span class="ptt-sum-val ${salary > 0 ? (diff >= 0 ? "profit" : "loss") : ""}">${salary > 0 ? (diff >= 0 ? "" : "") + _fmtE(diff) : "—"}</span>
+        <span class="ptt-sum-val ${salary > 0 ? (diff >= 0 ? "profit" : "loss") : ""}">${salary > 0 ? _fmtE(diff) : "—"}</span>
       </div>
       <div class="ptt-sum-card">
         <span class="ptt-sum-label">% of Salary</span>
@@ -245,7 +313,6 @@ function _renderHistory() {
   const salaries  = _getSalaries();
   const rate      = _getRate();
 
-  // Group by month
   const byMonth = {};
   Object.keys(hoursData).forEach(k => {
     const mk = k.slice(0, 7);
@@ -299,20 +366,17 @@ function _renderBankBalance() {
   const txs     = _getTxs();
   const today   = _today();
   const balance = _calcBalance(txs);
-  const balCls  = balance >= 0 ? "profit" : "loss";
 
-  // Compute running balance per transaction (oldest → newest)
   const withBal = [...txs].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   let running = _getInitBal();
   withBal.forEach(t => {
     running = t.type === "income" ? running + t.amount : running - t.amount;
     t._balAfter = running;
   });
-  withBal.reverse(); // show newest first
+  withBal.reverse();
 
-  // This month totals
   const thisMon    = today.slice(0, 7);
-  const monIncome  = txs.filter(t => t.date.startsWith(thisMon) && t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const monIncome  = txs.filter(t => t.date.startsWith(thisMon) && t.type === "income").reduce((s, t)  => s + t.amount, 0);
   const monExpense = txs.filter(t => t.date.startsWith(thisMon) && t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
   aside.innerHTML = `
@@ -375,7 +439,6 @@ function _renderBankBalance() {
           </div>`).join("")}
     </div>`;
 
-  // Type toggle
   aside.querySelectorAll(".ptt-type-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       _txType = btn.dataset.type;
@@ -383,7 +446,6 @@ function _renderBankBalance() {
     });
   });
 
-  // Set initial balance — styled modal
   _$("pttSetInitBtn")?.addEventListener("click", () => {
     const input = _$("pttInitBalInput");
     if (input) input.value = _getInitBal() || "";
@@ -391,7 +453,6 @@ function _renderBankBalance() {
     setTimeout(() => input?.focus(), 50);
   });
 
-  // Auto-format date as DD/MM/YYYY while typing
   _$("pttExpDate")?.addEventListener("input", (e) => {
     let v = e.target.value.replace(/\D/g, "").slice(0, 8);
     if (v.length >= 5) v = v.slice(0,2) + "/" + v.slice(2,4) + "/" + v.slice(4);
@@ -399,37 +460,42 @@ function _renderBankBalance() {
     e.target.value = v;
   });
 
-  // Add transaction
   _$("pttExpAddBtn")?.addEventListener("click", _addTx);
 
-  // Delete
   aside.querySelectorAll(".ptt-exp-del").forEach(btn => {
     btn.addEventListener("click", () => _deleteTx(btn.dataset.id));
   });
 }
 
-function _addTx() {
+async function _addTx() {
   const raw = (_$("pttExpDate")?.value || "").trim();
   const cat = _$("pttExpCat")?.value.trim();
   const amt = parseFloat(_$("pttExpAmt")?.value);
   if (!raw || !cat || isNaN(amt) || amt <= 0) return;
 
-  // Parse DD/MM/YYYY → YYYY-MM-DD
   const parts = raw.split("/");
   if (parts.length !== 3 || parts[2].length !== 4) return;
   const date = `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
 
-  const txs = _getTxs();
-  txs.push({ id: Date.now().toString(), date, type: _txType, category: cat, amount: amt });
-  localStorage.setItem(PTT_TX_KEY, JSON.stringify(txs));
+  const tx = { id: Date.now().toString(), date, type: _txType, category: cat, amount: amt };
+  _state.txs.push(tx);
+
   if (_$("pttExpCat")) _$("pttExpCat").value = "";
   if (_$("pttExpAmt")) _$("pttExpAmt").value = "";
   _renderBankBalance();
+
+  try {
+    await setDoc(doc(db, "nktt_ptt_tx", tx.id), tx);
+  } catch (e) { console.error("tx add:", e); }
 }
 
-function _deleteTx(id) {
-  localStorage.setItem(PTT_TX_KEY, JSON.stringify(_getTxs().filter(t => t.id !== id)));
+async function _deleteTx(id) {
+  _state.txs = _state.txs.filter(t => t.id !== id);
   _renderBankBalance();
+
+  try {
+    await deleteDoc(doc(db, "nktt_ptt_tx", id));
+  } catch (e) { console.error("tx del:", e); }
 }
 
 function _bindPttEvents() {
@@ -449,10 +515,11 @@ function _bindPttEvents() {
   });
 }
 
-function _confirmInitBal() {
+async function _confirmInitBal() {
   const val = parseFloat(_$("pttInitBalInput")?.value);
   if (isNaN(val)) return;
-  localStorage.setItem(PTT_BANK_KEY, val);
+  _state.bankInit = val;
   _$("pttInitBalModal")?.classList.add("hidden");
   _renderBankBalance();
+  await _saveSettings();
 }

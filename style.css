@@ -2945,15 +2945,8 @@ a { color: var(--accent); text-decoration: none; }
   text-align: center;
 }
 
-/* ── Part-Time: Bank Balance is the primary (wide) column, calendar is sidebar ── */
-#page-parttime .ptt-left {
-  flex: 0 0 340px !important;
-}
-#pttExpensePanel {
-  flex: 1 1 0 !important;
-  width: 0 !important;
-  min-width: 0;
-}
+/* ── Widen right panel on part-time page only ── */
+#pttExpensePanel { width: 460px; }
 
 /* ── Bank Balance hero ── */
 .ptt-bal-hero {
