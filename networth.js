@@ -2,7 +2,7 @@
 
 import { db } from "./firebase-config.js";
 import {
-  collection, getDocs, query, where, doc, getDoc
+  collection, getDocs, query, where, doc, getDoc, setDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const TRADES_COL        = "nktt_trades";
@@ -18,10 +18,11 @@ const PLATFORMS = [
 ];
 
 let _nwInit   = false;
-let _pdata    = {};  // { zerodha: { swing, intraday }, groww: { swing, intraday } }
+let _pdata    = {};
 let _bank     = 0;
 let _bankTxs  = [];
 let _bankInit = 0;
+let _others   = [];  // [{ id, sign, name, description, amount }]
 
 const $ = id => document.getElementById(id);
 
@@ -37,7 +38,8 @@ export async function initNetworth() {
 async function _loadAll() {
   await Promise.all([
     ...PLATFORMS.map(p => _loadPlatform(p)),
-    _loadBank()
+    _loadBank(),
+    _loadOthers()
   ]);
 }
 
@@ -146,6 +148,13 @@ async function _loadBank() {
   _bank = _bankTxs.reduce((b, t) => t.type === "income" ? b + t.amount : b - t.amount, _bankInit);
 }
 
+async function _loadOthers() {
+  try {
+    const snap = await getDocs(collection(db, "nktt_nw_others"));
+    _others = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch { _others = []; }
+}
+
 // ─── Shell ────────────────────────────────────────────────────────────────────
 function _renderShell() {
   const left  = $("nwPlatforms");
@@ -158,7 +167,24 @@ function _renderShell() {
       PLATFORMS.map((p, i) => _buildBlock(p, i * 90)).join("") +
     '</div>' +
     '<p class="nw-section-label nw-section-label-bank">Bank</p>' +
-    _buildBankBlock();
+    _buildBankBlock() +
+    '<p class="nw-section-label">Others</p>' +
+    '<div class="nw-others-section" id="nwOthersSection">' +
+      '<div class="nw-others-header">' +
+        '<span class="nw-others-hint">Money owed to you (+) or by you (−)</span>' +
+        '<button class="nw-others-add-btn" id="nwOthersAdd">+ Add Row</button>' +
+      '</div>' +
+      '<table class="nw-others-table">' +
+        '<thead><tr>' +
+          '<th class="nw-oth-th-sign">+/−</th>' +
+          '<th>Name</th>' +
+          '<th>Description</th>' +
+          '<th class="nw-oth-th-amt">Amount (€)</th>' +
+          '<th></th>' +
+        '</tr></thead>' +
+        '<tbody id="nwOthersTbody"></tbody>' +
+      '</table>' +
+    '</div>';
 
   right.innerHTML =
     '<div class="nw-right-inner">' +
@@ -243,6 +269,7 @@ function _buildBankBlock() {
 function _renderAll() {
   PLATFORMS.forEach(p => _renderPlatform(p));
   _renderBank();
+  _renderOthers();
   _renderSummary();
 }
 
@@ -317,6 +344,37 @@ function _renderBank() {
     '</div>';
 }
 
+function _othRowHtml(o) {
+  const plusCls = o.sign === "+" ? " nw-oth-plus" : " nw-oth-minus";
+  return (
+    '<td><button class="nw-oth-sign' + plusCls + '" data-id="' + o.id + '">' + o.sign + '</button></td>' +
+    '<td><input class="nw-oth-inp" data-id="' + o.id + '" data-field="name" value="' + (o.name||'').replace(/"/g,'&quot;') + '" placeholder="Name" /></td>' +
+    '<td><input class="nw-oth-inp" data-id="' + o.id + '" data-field="description" value="' + (o.description||'').replace(/"/g,'&quot;') + '" placeholder="Description" /></td>' +
+    '<td><input class="nw-oth-inp nw-oth-amt" type="number" data-id="' + o.id + '" data-field="amount" value="' + (o.amount||'') + '" placeholder="0.00" /></td>' +
+    '<td><button class="nw-oth-del" data-id="' + o.id + '">×</button></td>'
+  );
+}
+
+function _renderOthers() {
+  const tbody = $("nwOthersTbody");
+  if (!tbody) return;
+
+  const rows = _others.map(o =>
+    '<tr class="nw-oth-row" data-id="' + o.id + '">' + _othRowHtml(o) + '</tr>'
+  ).join("");
+
+  const newRow =
+    '<tr class="nw-oth-row nw-oth-new" id="nwOthNewRow">' +
+      '<td><button class="nw-oth-sign nw-oth-plus" id="nwOthNewSign">+</button></td>' +
+      '<td><input class="nw-oth-inp" id="nwOthNewName" placeholder="Name" /></td>' +
+      '<td><input class="nw-oth-inp" id="nwOthNewDesc" placeholder="Description" /></td>' +
+      '<td><input class="nw-oth-inp nw-oth-amt" type="number" id="nwOthNewAmt" placeholder="0.00" /></td>' +
+      '<td></td>' +
+    '</tr>';
+
+  tbody.innerHTML = rows + newRow;
+}
+
 // ─── Number counter animation ─────────────────────────────────────────────────
 function _countUp(el, rawVal, isEUR, ms = 900) {
   if (!rawVal || rawVal === 0) { el.textContent = isEUR ? _fmtEUR(0) : _fmtINR(0); return; }
@@ -335,12 +393,13 @@ function _countUp(el, rawVal, isEUR, ms = 900) {
 function _renderSummary() {
   const rate = _getRate();
 
-  const zerTotal = (_pdata.zerodha?.swing?.value ?? 0) + (_pdata.zerodha?.intraday?.value ?? 0);
-  const grrTotal = (_pdata.groww?.swing?.value   ?? 0) + (_pdata.groww?.intraday?.value   ?? 0);
-  const totalInr = zerTotal + grrTotal;
-  const totalEur = _bank;
+  const zerTotal  = (_pdata.zerodha?.swing?.value ?? 0) + (_pdata.zerodha?.intraday?.value ?? 0);
+  const grrTotal  = (_pdata.groww?.swing?.value   ?? 0) + (_pdata.groww?.intraday?.value   ?? 0);
+  const totalInr  = zerTotal + grrTotal;
+  const othersEur = _others.reduce((s, o) => s + (o.sign === "+" ? o.amount : -o.amount), 0);
+  const totalEur  = _bank + othersEur;
 
-  const allInr = totalInr + (_bank * rate);
+  const allInr = totalInr + (totalEur * rate);
   const allEur = totalEur + (totalInr / rate);
 
   // Hero
@@ -360,9 +419,10 @@ function _renderSummary() {
   if (!breakdown) return;
 
   const items = [
-    { label: "Zerodha", color: "#F97316", inrEquiv: zerTotal,      display: _fmtINR(zerTotal),   show: zerTotal > 0 || (_pdata.zerodha?.swing?.deposited ?? 0) > 0 },
-    { label: "Groww",   color: "#5367FF", inrEquiv: grrTotal,      display: _fmtINR(grrTotal),   show: grrTotal > 0 || (_pdata.groww?.swing?.deposited   ?? 0) > 0 },
-    { label: "Bank",    color: "#22c55e", inrEquiv: _bank * rate,  display: _fmtEUR(_bank),      show: true },
+    { label: "Zerodha", color: "#F97316", inrEquiv: zerTotal,         display: _fmtINR(zerTotal),   show: zerTotal > 0 || (_pdata.zerodha?.swing?.deposited ?? 0) > 0 },
+    { label: "Groww",   color: "#5367FF", inrEquiv: grrTotal,         display: _fmtINR(grrTotal),   show: grrTotal > 0 || (_pdata.groww?.swing?.deposited   ?? 0) > 0 },
+    { label: "Bank",    color: "#22c55e", inrEquiv: _bank * rate,     display: _fmtEUR(_bank),      show: true },
+    { label: "Others",  color: "#a78bfa", inrEquiv: othersEur * rate, display: _fmtEUR(othersEur),  show: _others.length > 0 },
   ].filter(i => i.show);
 
   const totalEquiv = items.reduce((s, i) => s + i.inrEquiv, 0);
@@ -419,7 +479,61 @@ function _bindEvents() {
       _renderAll();
       btn.classList.remove("nw-spinning");
       btn.disabled = false;
+      return;
     }
+
+    // Others: Add Row button
+    if (e.target.id === "nwOthersAdd") { _saveNewOther(); return; }
+
+    // Others: sign toggle on saved row
+    if (e.target.matches(".nw-oth-sign[data-id]")) {
+      const id = e.target.dataset.id;
+      const o  = _others.find(x => x.id === id);
+      if (!o) return;
+      o.sign = o.sign === "+" ? "-" : "+";
+      e.target.textContent = o.sign;
+      e.target.className   = "nw-oth-sign " + (o.sign === "+" ? "nw-oth-plus" : "nw-oth-minus");
+      _renderSummary();
+      setDoc(doc(db, "nktt_nw_others", id), _othClean(o)).catch(console.error);
+      return;
+    }
+
+    // Others: sign toggle on new row
+    if (e.target.id === "nwOthNewSign") {
+      const next = e.target.textContent === "+" ? "-" : "+";
+      e.target.textContent = next;
+      e.target.className   = "nw-oth-sign " + (next === "+" ? "nw-oth-plus" : "nw-oth-minus");
+      return;
+    }
+
+    // Others: delete
+    if (e.target.matches(".nw-oth-del[data-id]")) {
+      const id  = e.target.dataset.id;
+      const row = e.target.closest("tr");
+      _others   = _others.filter(o => o.id !== id);
+      row?.remove();
+      _renderSummary();
+      deleteDoc(doc(db, "nktt_nw_others", id)).catch(console.error);
+      return;
+    }
+  });
+
+  // Others: field change on saved rows
+  document.addEventListener("change", (e) => {
+    if (!e.target.matches(".nw-oth-inp[data-id][data-field]")) return;
+    const id    = e.target.dataset.id;
+    const field = e.target.dataset.field;
+    const o     = _others.find(x => x.id === id);
+    if (!o) return;
+    o[field] = field === "amount" ? (parseFloat(e.target.value) || 0) : e.target.value;
+    _renderSummary();
+    clearTimeout(o._t);
+    o._t = setTimeout(() => setDoc(doc(db, "nktt_nw_others", id), _othClean(o)).catch(console.error), 600);
+  });
+
+  // Others: Enter on new row amount saves it
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.id === "nwOthNewAmt") _saveNewOther();
   });
 
   document.addEventListener("input", (e) => {
@@ -430,6 +544,41 @@ function _bindEvents() {
       _renderSummary();
     }
   });
+}
+
+function _othClean(o) {
+  return { id: o.id, sign: o.sign, name: o.name || "", description: o.description || "", amount: o.amount || 0 };
+}
+
+function _saveNewOther() {
+  const sign = $("nwOthNewSign")?.textContent || "+";
+  const name = ($("nwOthNewName")?.value || "").trim();
+  const desc = ($("nwOthNewDesc")?.value || "").trim();
+  const amt  = parseFloat($("nwOthNewAmt")?.value);
+  if (!name || isNaN(amt) || amt <= 0) return;
+
+  const id    = Date.now().toString();
+  const entry = { id, sign, name, description: desc, amount: amt };
+  _others.push(entry);
+
+  // Insert new DOM row before the new-row template
+  const newRowEl = $("nwOthNewRow");
+  if (newRowEl) {
+    const tr = document.createElement("tr");
+    tr.className    = "nw-oth-row";
+    tr.dataset.id   = id;
+    tr.innerHTML    = _othRowHtml(entry);
+    newRowEl.parentNode.insertBefore(tr, newRowEl);
+  }
+
+  // Clear the new-row inputs
+  if ($("nwOthNewSign")) { $("nwOthNewSign").textContent = "+"; $("nwOthNewSign").className = "nw-oth-sign nw-oth-plus"; }
+  if ($("nwOthNewName")) $("nwOthNewName").value = "";
+  if ($("nwOthNewDesc")) $("nwOthNewDesc").value = "";
+  if ($("nwOthNewAmt"))  $("nwOthNewAmt").value  = "";
+
+  _renderSummary();
+  setDoc(doc(db, "nktt_nw_others", id), entry).catch(console.error);
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
