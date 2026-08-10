@@ -3353,7 +3353,9 @@ a { color: var(--accent); text-decoration: none; }
 /* Block colored header */
 .nw-block-head {
   position: relative; overflow: hidden;
-  padding: 12px 16px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 12px;
   background: linear-gradient(145deg,
     rgba(var(--nw-r,249),var(--nw-g,115),var(--nw-b,22),0.20) 0%,
     rgba(var(--nw-r,249),var(--nw-g,115),var(--nw-b,22),0.07) 100%
@@ -3378,15 +3380,18 @@ a { color: var(--accent); text-decoration: none; }
 .nw-bh-amount {
   font-family: var(--ff-display); font-size: 22px; font-weight: 900;
   color: var(--text-1); letter-spacing: -0.04em; line-height: 1;
-  margin-bottom: 3px;
 }
 .nw-block-wide .nw-bh-amount { font-size: 26px; }
 
+.nw-bh-right {
+  display: flex; flex-direction: column; align-items: flex-end; text-align: right;
+  flex: 1; min-width: 0;
+}
 .nw-bh-name {
-  font-size: 12px; font-weight: 700; color: var(--nw-c, var(--accent));
+  font-size: 11px; font-weight: 700; color: var(--nw-c, var(--accent));
   text-transform: uppercase; letter-spacing: 0.08em;
 }
-.nw-bh-sub { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.nw-bh-sub { font-size: 10px; color: var(--text-3); margin-top: 1px; }
 
 /* Block stats body */
 .nw-block-body { padding: 10px 14px 12px; }

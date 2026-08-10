@@ -235,9 +235,11 @@ function _buildBlock(p, delay) {
       '<div class="nw-block-head">' +
         '<div class="nw-bh-orb"></div>' +
         '<div class="nw-bh-logo" style="background:' + p.color + ';box-shadow:0 4px 16px rgba(' + r + ',' + g + ',' + b + ',.45)">' + p.letter + '</div>' +
-        '<div class="nw-bh-amount" id="nwVal' + p.id + '"><span class="nw-spinner"></span></div>' +
-        '<div class="nw-bh-name">' + p.name + '</div>' +
-        '<div class="nw-bh-sub">Swing · Intraday</div>' +
+        '<div class="nw-bh-right">' +
+          '<div class="nw-bh-amount" id="nwVal' + p.id + '"><span class="nw-spinner"></span></div>' +
+          '<div class="nw-bh-name">' + p.name + '</div>' +
+          '<div class="nw-bh-sub">Swing · Intraday</div>' +
+        '</div>' +
       '</div>' +
       '<div class="nw-block-body" id="nwStats' + p.id + '">' +
         '<div style="padding:12px;text-align:center"><span class="nw-spinner"></span></div>' +
@@ -254,9 +256,11 @@ function _buildBankBlock() {
       '<div class="nw-block-head">' +
         '<div class="nw-bh-orb"></div>' +
         '<div class="nw-bh-logo" style="background:#22c55e;box-shadow:0 4px 16px rgba(34,197,94,.45)">€</div>' +
-        '<div class="nw-bh-amount" id="nwValBank"><span class="nw-spinner"></span></div>' +
-        '<div class="nw-bh-name">Bank Balance</div>' +
-        '<div class="nw-bh-sub">Personal Account</div>' +
+        '<div class="nw-bh-right">' +
+          '<div class="nw-bh-amount" id="nwValBank"><span class="nw-spinner"></span></div>' +
+          '<div class="nw-bh-name">Bank Balance</div>' +
+          '<div class="nw-bh-sub">Personal Account</div>' +
+        '</div>' +
       '</div>' +
       '<div class="nw-block-body" id="nwStatsBank">' +
         '<div style="padding:12px;text-align:center"><span class="nw-spinner"></span></div>' +
