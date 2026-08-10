@@ -2,7 +2,7 @@
 
 import { db } from "./firebase-config.js";
 import {
-  collection, getDocs, query, where
+  collection, getDocs, query, where, doc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const TRADES_COL        = "nktt_trades";
@@ -17,9 +17,11 @@ const PLATFORMS = [
   { id: "groww",   name: "Groww",   color: "#5367FF", letter: "G" },
 ];
 
-let _nwInit = false;
-let _pdata  = {};  // { zerodha: { swing, intraday }, groww: { swing, intraday } }
-let _bank   = 0;
+let _nwInit   = false;
+let _pdata    = {};  // { zerodha: { swing, intraday }, groww: { swing, intraday } }
+let _bank     = 0;
+let _bankTxs  = [];
+let _bankInit = 0;
 
 const $ = id => document.getElementById(id);
 
@@ -33,8 +35,10 @@ export async function initNetworth() {
 
 // ─── Data Loading ─────────────────────────────────────────────────────────────
 async function _loadAll() {
-  await Promise.all(PLATFORMS.map(p => _loadPlatform(p)));
-  _loadBank();
+  await Promise.all([
+    ...PLATFORMS.map(p => _loadPlatform(p)),
+    _loadBank()
+  ]);
 }
 
 async function _loadPlatform(p) {
@@ -127,10 +131,19 @@ async function _loadIntraday(fund) {
   }
 }
 
-function _loadBank() {
-  const initBal = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0");
-  const txs     = JSON.parse(localStorage.getItem(PTT_TX_KEY) || "[]");
-  _bank = txs.reduce((b, t) => t.type === "income" ? b + t.amount : b - t.amount, initBal);
+async function _loadBank() {
+  try {
+    const [settingsSnap, txSnap] = await Promise.all([
+      getDoc(doc(db, "nktt_parttime", "settings")),
+      getDocs(collection(db, "nktt_ptt_tx"))
+    ]);
+    _bankInit = settingsSnap.exists() ? (settingsSnap.data().bankInit ?? 0) : 0;
+    _bankTxs  = txSnap.docs.map(d => d.data());
+  } catch {
+    _bankInit = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0") || 0;
+    try { _bankTxs = JSON.parse(localStorage.getItem(PTT_TX_KEY) || "[]"); } catch { _bankTxs = []; }
+  }
+  _bank = _bankTxs.reduce((b, t) => t.type === "income" ? b + t.amount : b - t.amount, _bankInit);
 }
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
@@ -286,10 +299,8 @@ function _tile(label, value, cls) {
 }
 
 function _renderBank() {
-  const initBal = parseFloat(localStorage.getItem(PTT_BANK_KEY) || "0");
-  const txs     = JSON.parse(localStorage.getItem(PTT_TX_KEY) || "[]");
-  const income  = txs.filter(t => t.type === "income").reduce((s, t)  => s + t.amount, 0);
-  const expense = txs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const income  = _bankTxs.filter(t => t.type === "income").reduce((s, t)  => s + t.amount, 0);
+  const expense = _bankTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
   const valEl = $("nwValBank");
   if (valEl) _countUp(valEl, _bank, true);
@@ -300,7 +311,7 @@ function _renderBank() {
   stats.innerHTML =
     '<div class="nw-tile-grid nw-tile-grid-4">' +
       _tile("Balance",     _fmtEUR(_bank),    "accent") +
-      _tile("Opening",     _fmtEUR(initBal)) +
+      _tile("Opening",     _fmtEUR(_bankInit)) +
       _tile("Income",      "+" + _fmtEUR(income),  "profit") +
       _tile("Expenses",    "−" + _fmtEUR(expense),  "loss") +
     '</div>';
