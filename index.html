@@ -278,20 +278,31 @@
 
     <!-- Part-Time Page -->
     <main id="page-parttime" class="main-content hidden">
-      <section class="section-left ptt-left">
-        <div class="section-header">
+
+      <!-- Column 1: Calendar + Summary -->
+      <section class="ptt-col ptt-col-left">
+        <div class="ptt-col-header">
           <div class="section-title-group">
             <h1 class="section-title">Part-Time</h1>
           </div>
-          <div id="pttSettingsBar" class="ptt-settings-bar"></div>
         </div>
         <div class="ptt-scroll-body">
           <div id="pttCalendar" class="ptt-calendar-wrap"></div>
+        </div>
+      </section>
+
+      <!-- Column 2: Summary + Fixed Costs + Monthly History -->
+      <section class="ptt-col ptt-col-mid">
+        <div class="ptt-scroll-body">
           <div id="pttMonthSummary" class="ptt-month-summary"></div>
+          <div id="pttFixedCosts" class="ptt-fixed-section"></div>
           <div id="pttHistory" class="ptt-history-section"></div>
         </div>
       </section>
+
+      <!-- Column 3: Bank Balance -->
       <aside class="section-right" id="pttExpensePanel"></aside>
+
     </main>
 
     <!-- Net Worth Page -->

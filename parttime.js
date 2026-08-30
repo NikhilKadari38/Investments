@@ -17,7 +17,7 @@ const MONTHS = ["January","February","March","April","May","June",
 const DOW    = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 // ── In-memory state (synced from Firestore) ───────────────────────────────────
-let _state = { rate: 14, bankInit: 0, hours: {}, salaries: {}, txs: [] };
+let _state = { rate: 14, bankInit: 0, hours: {}, salaries: {}, txs: [], fixedCosts: {} };
 let _pttYear  = new Date().getFullYear();
 let _pttMonth = new Date().getMonth();
 let _pttInit  = false;
@@ -25,6 +25,7 @@ let _txType   = "expense";
 let _settingsTimer = null;
 
 const _$       = (id)    => document.getElementById(id);
+const _esc     = (s)     => String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const _pad     = (n)     => String(n).padStart(2, "0");
 const _today   = ()      => { const n = new Date(); return `${n.getFullYear()}-${_pad(n.getMonth()+1)}-${_pad(n.getDate())}`; };
 const _dateKey = (y,m,d) => `${y}-${_pad(m+1)}-${_pad(d)}`;
@@ -101,6 +102,10 @@ async function _loadFromFirestore() {
     } else {
       _state.txs = txSnap.docs.map(d => d.data());
     }
+
+    // Load fixed costs (one doc per month key)
+    const fixedSnap = await getDocs(collection(db, "nktt_ptt_fixed"));
+    fixedSnap.docs.forEach(d => { _state.fixedCosts[d.id] = d.data().items || []; });
   } catch (e) {
     console.error("ptt load from Firestore:", e);
     // Fallback to localStorage if Firestore is unavailable
@@ -127,44 +132,11 @@ export async function initParttime() {
 }
 
 function _renderAll() {
-  _renderSettingsBar();
   _renderCalendar();
   _recalcSummary();
+  _renderFixed();
   _renderHistory();
   _renderBankBalance();
-}
-
-// ── Settings Bar ──────────────────────────────────────────────────────────────
-function _renderSettingsBar() {
-  const el = _$("pttSettingsBar");
-  if (!el) return;
-  const sal = _getSalaries()[_monKey(_pttYear, _pttMonth)] ?? 0;
-  el.innerHTML = `
-    <label class="ptt-sb-field">
-      <span class="ptt-sb-label">Hourly Rate (€)</span>
-      <input id="pttRateInput" type="number" step="0.5" min="0" value="${_getRate()}" class="ptt-sb-input" />
-    </label>
-    <label class="ptt-sb-field">
-      <span class="ptt-sb-label">Monthly Salary (€)</span>
-      <input id="pttSalaryInput" type="number" step="10" min="0" value="${sal || ""}" placeholder="0" class="ptt-sb-input" />
-    </label>`;
-
-  _$("pttRateInput").addEventListener("input", () => {
-    const v = parseFloat(_$("pttRateInput").value);
-    _state.rate = isNaN(v) ? 14 : v;
-    _renderCalendar();
-    _recalcSummary();
-    _renderHistory();
-    _saveSettings();
-  });
-
-  _$("pttSalaryInput").addEventListener("input", () => {
-    const v = parseFloat(_$("pttSalaryInput").value);
-    _state.salaries[_monKey(_pttYear, _pttMonth)] = isNaN(v) ? 0 : v;
-    _recalcSummary();
-    _renderHistory();
-    _saveSettings();
-  });
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -174,6 +146,7 @@ function _renderCalendar() {
 
   const rate        = _getRate();
   const hoursData   = _getHours();
+  const sal         = _getSalaries()[_monKey(_pttYear, _pttMonth)] ?? 0;
   const daysInMonth = new Date(_pttYear, _pttMonth + 1, 0).getDate();
   const firstDay    = new Date(_pttYear, _pttMonth, 1).getDay();
   const startOffset = (firstDay + 6) % 7;
@@ -184,6 +157,16 @@ function _renderCalendar() {
       <button class="ptt-nav-btn" id="pttPrevMonth">&#8592;</button>
       <h2 class="ptt-cal-title">${MONTHS[_pttMonth]} ${_pttYear}</h2>
       <button class="ptt-nav-btn" id="pttNextMonth">&#8594;</button>
+      <div class="ptt-cal-nav-settings">
+        <label class="ptt-sb-field">
+          <span class="ptt-sb-label">Hourly Rate (€)</span>
+          <input id="pttRateInput" type="number" step="0.5" min="0" value="${rate}" class="ptt-sb-input" />
+        </label>
+        <label class="ptt-sb-field">
+          <span class="ptt-sb-label">Monthly Salary (€)</span>
+          <input id="pttSalaryInput" type="number" step="10" min="0" value="${sal || ""}" placeholder="0" class="ptt-sb-input" />
+        </label>
+      </div>
     </div>
     <div class="ptt-cal-card">
       <div class="ptt-cal-grid" id="pttCalGrid"></div>
@@ -251,16 +234,32 @@ function _renderCalendar() {
   _$("pttPrevMonth").addEventListener("click", () => {
     _pttMonth--;
     if (_pttMonth < 0) { _pttMonth = 11; _pttYear--; }
-    _renderSettingsBar();
     _renderCalendar();
     _recalcSummary();
+    _renderFixed();
   });
   _$("pttNextMonth").addEventListener("click", () => {
     _pttMonth++;
     if (_pttMonth > 11) { _pttMonth = 0; _pttYear++; }
-    _renderSettingsBar();
     _renderCalendar();
     _recalcSummary();
+    _renderFixed();
+  });
+
+  _$("pttRateInput")?.addEventListener("input", () => {
+    const v = parseFloat(_$("pttRateInput").value);
+    _state.rate = isNaN(v) ? 14 : v;
+    _renderCalendar();
+    _recalcSummary();
+    _renderHistory();
+    _saveSettings();
+  });
+  _$("pttSalaryInput")?.addEventListener("input", () => {
+    const v = parseFloat(_$("pttSalaryInput").value);
+    _state.salaries[_monKey(_pttYear, _pttMonth)] = isNaN(v) ? 0 : v;
+    _recalcSummary();
+    _renderHistory();
+    _saveSettings();
   });
 }
 
@@ -284,22 +283,30 @@ function _recalcSummary() {
   if (!el) return;
 
   el.innerHTML = `
-    <div class="ptt-sum-cards">
-      <div class="ptt-sum-card">
-        <span class="ptt-sum-label">Total Hours</span>
-        <span class="ptt-sum-val">${totalHours.toFixed(1)}</span>
+    <div class="ptt-fixed-card">
+      <div class="ptt-fixed-header">
+        <div class="ptt-fixed-title-group">
+          <h3 class="ptt-fixed-title">Monthly Summary</h3>
+          <span class="ptt-fixed-mon">${MONTHS[_pttMonth]} ${_pttYear}</span>
+        </div>
       </div>
-      <div class="ptt-sum-card">
-        <span class="ptt-sum-label">Total Earnings</span>
-        <span class="ptt-sum-val profit">${_fmtE(totalEarn)}</span>
-      </div>
-      <div class="ptt-sum-card">
-        <span class="ptt-sum-label">VS. Salary</span>
-        <span class="ptt-sum-val ${salary > 0 ? (diff >= 0 ? "profit" : "loss") : ""}">${salary > 0 ? _fmtE(diff) : "—"}</span>
-      </div>
-      <div class="ptt-sum-card">
-        <span class="ptt-sum-label">% of Salary</span>
-        <span class="ptt-sum-val ${pct !== null && pct >= 100 ? "profit" : ""}">${pct !== null ? pct.toFixed(1) + "%" : "—"}</span>
+      <div class="ptt-sum-cards">
+        <div class="ptt-sum-card">
+          <span class="ptt-sum-label">Total Hours</span>
+          <span class="ptt-sum-val">${totalHours.toFixed(1)}</span>
+        </div>
+        <div class="ptt-sum-card">
+          <span class="ptt-sum-label">Total Earnings</span>
+          <span class="ptt-sum-val profit">${_fmtE(totalEarn)}</span>
+        </div>
+        <div class="ptt-sum-card">
+          <span class="ptt-sum-label">VS. Salary</span>
+          <span class="ptt-sum-val ${salary > 0 ? (diff >= 0 ? "profit" : "loss") : ""}">${salary > 0 ? _fmtE(diff) : "—"}</span>
+        </div>
+        <div class="ptt-sum-card">
+          <span class="ptt-sum-label">% of Salary</span>
+          <span class="ptt-sum-val ${pct !== null && pct >= 100 ? "profit" : ""}">${pct !== null ? pct.toFixed(1) + "%" : "—"}</span>
+        </div>
       </div>
     </div>`;
 }
@@ -496,6 +503,90 @@ async function _deleteTx(id) {
   try {
     await deleteDoc(doc(db, "nktt_ptt_tx", id));
   } catch (e) { console.error("tx del:", e); }
+}
+
+// ── Fixed Costs ───────────────────────────────────────────────────────────────
+async function _saveFixed(mk) {
+  try {
+    await setDoc(doc(db, "nktt_ptt_fixed", mk), { items: _state.fixedCosts[mk] || [] });
+  } catch (e) { console.error("fixed save:", e); }
+}
+
+function _fixedRowHtml(item) {
+  return `<tr data-id="${item.id}">
+    <td><input class="ptt-fixed-inp ptt-fi-name" value="${_esc(item.name)}" placeholder="Rent" /></td>
+    <td><input class="ptt-fixed-inp ptt-fi-desc" value="${_esc(item.description)}" placeholder="Monthly apartment rent" /></td>
+    <td><input class="ptt-fixed-inp ptt-fi-amt" type="number" value="${item.amount || ""}" min="0" step="0.01" placeholder="0.00" /></td>
+    <td><button class="ptt-fixed-del" data-id="${item.id}">✕</button></td>
+  </tr>`;
+}
+
+function _renderFixed() {
+  const el = _$("pttFixedCosts");
+  if (!el) return;
+  const mk    = _monKey(_pttYear, _pttMonth);
+  const items = _state.fixedCosts[mk] || [];
+  const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+
+  el.innerHTML = `
+    <div class="ptt-fixed-card">
+      <div class="ptt-fixed-header">
+        <div class="ptt-fixed-title-group">
+          <h3 class="ptt-fixed-title">Fixed Costs</h3>
+          <span class="ptt-fixed-mon">${MONTHS[_pttMonth]} ${_pttYear}</span>
+        </div>
+        <button class="ptt-fixed-add-btn" id="pttFixedAddBtn">+ Add</button>
+      </div>
+      <table class="ptt-fixed-table">
+        <thead><tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th class="td-num-right">Amount (€)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pttFixedTbody">
+          ${items.length
+            ? items.map(_fixedRowHtml).join("")
+            : `<tr class="ptt-fixed-empty-row"><td colspan="4">No fixed costs for this month. Click + Add to start.</td></tr>`}
+        </tbody>
+      </table>
+      ${total > 0 ? `<div class="ptt-fixed-total">Monthly total: <span class="loss">${_fmtE(total)}</span></div>` : ""}
+    </div>`;
+
+  _$("pttFixedAddBtn")?.addEventListener("click", () => {
+    const mk2 = _monKey(_pttYear, _pttMonth);
+    if (!_state.fixedCosts[mk2]) _state.fixedCosts[mk2] = [];
+    _state.fixedCosts[mk2].push({ id: Date.now().toString(), name: "", description: "", amount: 0 });
+    _renderFixed();
+    setTimeout(() => {
+      const rows = _$("pttFixedTbody")?.querySelectorAll("tr[data-id]");
+      if (rows?.length) rows[rows.length - 1].querySelector(".ptt-fi-name")?.focus();
+    }, 10);
+  });
+
+  const tbody = _$("pttFixedTbody");
+  if (!tbody) return;
+
+  tbody.addEventListener("change", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (!row) return;
+    const mk2  = _monKey(_pttYear, _pttMonth);
+    const item = (_state.fixedCosts[mk2] || []).find(i => i.id === row.dataset.id);
+    if (!item) return;
+    if (e.target.classList.contains("ptt-fi-name"))      item.name        = e.target.value.trim();
+    else if (e.target.classList.contains("ptt-fi-desc")) item.description = e.target.value.trim();
+    else if (e.target.classList.contains("ptt-fi-amt"))  item.amount      = parseFloat(e.target.value) || 0;
+    if (e.target.classList.contains("ptt-fi-amt")) _renderFixed();
+    _saveFixed(mk2);
+  });
+
+  tbody.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("ptt-fixed-del")) return;
+    const mk2 = _monKey(_pttYear, _pttMonth);
+    _state.fixedCosts[mk2] = (_state.fixedCosts[mk2] || []).filter(i => i.id !== e.target.dataset.id);
+    _renderFixed();
+    _saveFixed(mk2);
+  });
 }
 
 function _bindPttEvents() {
