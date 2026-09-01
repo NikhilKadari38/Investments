@@ -3726,7 +3726,7 @@ a { color: var(--accent); text-decoration: none; }
 .nw-rate-row { display: flex; align-items: center; gap: 7px; }
 .nw-rate-sym { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .nw-rate-input {
-  width: 72px; padding: 5px 8px; border-radius: 7px;
+  width: 100px; padding: 5px 8px; border-radius: 7px;
   border: 1px solid var(--border); background: var(--surface-2);
   color: var(--text-1); font-family: var(--ff-mono); font-size: 14px;
   font-weight: 700; text-align: center;
