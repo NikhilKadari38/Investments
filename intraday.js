@@ -289,7 +289,7 @@ function _renderSummary() {
   const longCount  = _trades.filter(t => t.direction === "long").length;
   const shortCount = _trades.filter(t => t.direction === "short").length;
 
-  const withdrawable = Math.max(0, totalEffective - capital - totalWithdrawn);
+  const withdrawable = Math.max(0, totalEffective - totalWithdrawn);
   const grossCls     = totalGross     >= 0 ? "profit" : "loss";
   const effectiveCls = totalEffective >= 0 ? "profit" : "loss";
 
