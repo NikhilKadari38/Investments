@@ -19,10 +19,25 @@ let _fundsAdvice = {};     // cache: "fund_bucket" → advice string
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $        = (id) => document.getElementById(id);
-const _capKey  = () => "intradayCapital_"     + _fund;
 const _wdKey   = () => "intradayWithdrawals_" + _fund;
-const _getCap  = () => parseFloat(localStorage.getItem(_capKey())  || "0");
-const _getWds  = () => JSON.parse(localStorage.getItem(_wdKey())   || "[]");
+const _depKey  = () => "intradayDeposits_"    + _fund;
+const _getWds  = () => { try { return JSON.parse(localStorage.getItem(_wdKey())  || "[]"); } catch { return []; } };
+const _getDeps = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(_depKey()) || "[]");
+    if (stored.length > 0) return stored;
+    // Auto-migrate from old single-number capital key
+    const oldCap = parseFloat(localStorage.getItem("intradayCapital_" + _fund) || "0");
+    if (oldCap > 0) {
+      const migrated = [{ id: "init", date: "Initial", amount: oldCap, note: "Initial capital" }];
+      localStorage.setItem(_depKey(), JSON.stringify(migrated));
+      localStorage.removeItem("intradayCapital_" + _fund);
+      return migrated;
+    }
+    return [];
+  } catch { return []; }
+};
+const _getCap  = () => _getDeps().reduce((s, d) => s + d.amount, 0);
 
 function _fmt(v) {
   if (v === null || v === undefined || isNaN(v)) return "–";
@@ -236,7 +251,8 @@ function _renderSummary() {
   const aside = $("intradaySummary");
   if (!aside) return;
 
-  const capital       = _getCap();
+  const deposits      = _getDeps();
+  const capital       = deposits.reduce((s, d) => s + d.amount, 0);
   const withdrawals   = _getWds();
   const totalWithdrawn = withdrawals.reduce((s, w) => s + w.amount, 0);
 
@@ -296,16 +312,22 @@ function _renderSummary() {
   aside.innerHTML = `
     <h2 class="sum-head">Intraday</h2>
 
-    <div class="sum-hero id-capital-hero">
+    <div class="sum-hero id-capital-hero${deposits.length > 0 ? " id-dep-log-btn" : ""}" style="${deposits.length > 0 ? "cursor:pointer" : ""}">
       <div>
-        <div class="sum-hero-label">Trading Capital
+        <div class="sum-hero-label">Account Balance
           <span class="id-fund-tag">${_fund === "zerodha" ? "Zerodha" : "Groww"}</span>
         </div>
         <div class="sum-hero-val" id="idCapitalVal">
-          ${capital > 0 ? _fmt(capital) : '<span class="id-cap-placeholder">Tap ✎ to set</span>'}
+          ${capital > 0 ? _fmt(capital + totalEffective) : '<span class="id-cap-placeholder">Tap + to add deposit</span>'}
         </div>
+        ${capital > 0 ? `<div class="id-dep-chips">${(() => {
+          const base = _fmt(deposits[0].amount);
+          const pl   = totalEffective !== 0 ? `${totalEffective >= 0 ? "+" : ""}${_fmt(totalEffective)} P/L` : null;
+          const extra = deposits.length > 1 ? `+${_fmt(deposits.slice(1).reduce((s,d)=>s+d.amount,0))} new` : null;
+          return [base, pl, extra].filter(Boolean).join(" · ");
+        })()}</div>` : ""}
       </div>
-      <div class="sum-hero-badge id-edit-cap" title="Edit capital" style="cursor:pointer">✎</div>
+      <div class="sum-hero-badge id-add-deposit" title="Add deposit" style="cursor:pointer"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></div>
     </div>
 
     <div class="sum-stat-pair">
@@ -398,7 +420,8 @@ function _renderSummary() {
     }) : ""}
   `;
 
-  aside.querySelector(".id-edit-cap")?.addEventListener("click", _editCapital);
+  aside.querySelector(".id-add-deposit")?.addEventListener("click", (e) => { e.stopPropagation(); _showDepositModal(); });
+  aside.querySelector(".id-dep-log-btn")?.addEventListener("click", _showDepositLogModal);
   const wOval = $("withdrawableOval");
   if (wOval && withdrawable > 0) wOval.addEventListener("click", () => _showWithdrawModal(withdrawable));
   const wLogOval = $("totalWithdrawnOval");
@@ -427,26 +450,71 @@ function _renderSummary() {
   }
 }
 
-// ── Capital Edit ──────────────────────────────────────────────────────────────
-function _editCapital() {
-  const current  = _getCap();
-  const fundName = _fund === "zerodha" ? "Zerodha" : "Groww";
-  _showIdConfirm({
-    icon: "✎",
-    title: `${fundName} Capital`,
-    msg: current > 0 ? `Current: ${_fmt(current)}` : "Set your starting capital",
-    confirmLabel: "Update",
-    showInput: true,
-    inputValue: current > 0 ? current : "",
-    inputPlaceholder: "Enter amount in ₹",
-    onOk: (val) => {
-      const parsed = parseFloat(val);
-      if (isNaN(parsed) || parsed < 0) { _toast("Invalid amount.", "error"); return; }
-      localStorage.setItem(_capKey(), parsed);
-      _renderSummary();
-      _toast("Capital updated.", "success");
-    }
+// ── Deposit ───────────────────────────────────────────────────────────────────
+function _showDepositModal() {
+  const modal = $("depositModal");
+  if (!modal) return;
+  const amt  = $("depositAmountInput");
+  const note = $("depositNoteInput");
+  if (amt)  amt.value  = "";
+  if (note) note.value = "";
+  modal.classList.remove("hidden");
+  amt?.focus();
+}
+
+function _closeDepositModal() {
+  $("depositModal")?.classList.add("hidden");
+}
+
+function _confirmDeposit() {
+  const amt  = parseFloat($("depositAmountInput")?.value);
+  const note = $("depositNoteInput")?.value.trim() || "";
+  if (!amt || amt <= 0) { _toast("Enter a valid amount.", "error"); return; }
+  const deps = _getDeps();
+  const dateLabel = new Date().toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric"
   });
+  deps.push({ id: Date.now().toString(), date: dateLabel, amount: amt, note });
+  localStorage.setItem(_depKey(), JSON.stringify(deps));
+  _closeDepositModal();
+  _renderSummary();
+  _toast("Deposit added.", "success");
+}
+
+function _showDepositLogModal() {
+  const modal = $("depositLogModal");
+  const body  = $("depositLogBody");
+  if (!modal || !body) return;
+  const deps  = _getDeps();
+  if (!deps.length) { body.innerHTML = `<p class="wl-empty">No deposits yet.</p>`; }
+  else {
+    const total = deps.reduce((s, d) => s + d.amount, 0);
+    body.innerHTML = deps.map(d => `
+      <div class="wl-item">
+        <div class="wl-item-left">
+          <span class="wl-item-date">${d.date}</span>
+          <span class="wl-item-note">${d.note || "Deposit"}</span>
+        </div>
+        <div class="wl-item-right">
+          <span class="wl-item-amt">${_fmt(d.amount)}</span>
+          ${d.id !== "init" ? `<button class="wl-item-del" data-id="${d.id}">✕</button>` : ""}
+        </div>
+      </div>`).join("") +
+      `<div class="wl-total-row"><span>Total Capital</span><span>${_fmt(total)}</span></div>`;
+    body.querySelectorAll(".wl-item-del").forEach(btn =>
+      btn.addEventListener("click", () => {
+        const deps2 = _getDeps().filter(d => d.id !== btn.dataset.id);
+        localStorage.setItem(_depKey(), JSON.stringify(deps2));
+        _showDepositLogModal();
+        _renderSummary();
+      })
+    );
+  }
+  modal.classList.remove("hidden");
+}
+
+function _closeDepositLogModal() {
+  $("depositLogModal")?.classList.add("hidden");
 }
 
 // ── Funds Reminder ────────────────────────────────────────────────────────────
@@ -873,6 +941,18 @@ function _bindEvents() {
   $("withdrawLogCloseBtn")?.addEventListener("click", _closeWithdrawLogModal);
   $("withdrawLogDoneBtn")?.addEventListener("click",  _closeWithdrawLogModal);
   $("withdrawLogModal")?.addEventListener("click", (e) => { if (e.target === $("withdrawLogModal")) _closeWithdrawLogModal(); });
+
+  // Deposit modal
+  $("depositCloseBtn")?.addEventListener("click",   _closeDepositModal);
+  $("depositCancelBtn")?.addEventListener("click",  _closeDepositModal);
+  $("depositConfirmBtn")?.addEventListener("click", _confirmDeposit);
+  $("depositModal")?.addEventListener("click", (e) => { if (e.target === $("depositModal")) _closeDepositModal(); });
+  $("depositAmountInput")?.addEventListener("keydown", (e) => { if (e.key === "Enter") _confirmDeposit(); });
+
+  // Deposit log modal
+  $("depositLogCloseBtn")?.addEventListener("click", _closeDepositLogModal);
+  $("depositLogDoneBtn")?.addEventListener("click",  _closeDepositLogModal);
+  $("depositLogModal")?.addEventListener("click", (e) => { if (e.target === $("depositLogModal")) _closeDepositLogModal(); });
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
