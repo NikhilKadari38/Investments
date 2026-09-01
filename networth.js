@@ -95,7 +95,15 @@ async function _loadSwing(fund) {
 
 async function _loadIntraday(fund) {
   try {
-    const capital    = parseFloat(localStorage.getItem("intradayCapital_" + fund) || "0");
+    const _deps = (() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem("intradayDeposits_" + fund) || "[]");
+        if (stored.length > 0) return stored;
+        const oldCap = parseFloat(localStorage.getItem("intradayCapital_" + fund) || "0");
+        return oldCap > 0 ? [{ amount: oldCap }] : [];
+      } catch { return []; }
+    })();
+    const capital    = _deps.reduce((s, d) => s + d.amount, 0);
     const withdrawals = JSON.parse(localStorage.getItem("intradayWithdrawals_" + fund) || "[]");
     const totalWithdrawn = withdrawals.reduce((s, w) => s + w.amount, 0);
 
@@ -104,7 +112,7 @@ async function _loadIntraday(fund) {
       getDocs(query(collection(db, INTRADAY_DAYS_COL), where("fund", "==", fund))),
     ]);
 
-    if (snap1.docs.length === 0 && capital === 0) return null;
+    if (snap1.docs.length === 0 && capital === 0 && _deps.length === 0) return null;
 
     const trades = snap1.docs.map(d => d.data());
     const dayActuals = {};
