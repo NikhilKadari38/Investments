@@ -605,5 +605,6 @@ function _fmtINR(val) {
 
 function _fmtEUR(val) {
   if (val === null || val === undefined || isNaN(val)) return "–";
-  return "€" + Math.abs(val).toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sign = val < 0 ? "−€" : "€";
+  return sign + Math.abs(val).toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
