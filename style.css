@@ -1979,6 +1979,8 @@ a { color: var(--accent); text-decoration: none; }
 
 /* Log container */
 .intraday-log {
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 18px;
