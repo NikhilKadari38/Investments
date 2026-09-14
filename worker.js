@@ -16,7 +16,7 @@ export default {
       return new Response(null, { headers: _cors() });
     }
 
-    const nonSymbolTypes = ["news", "ai", "kite-callback", "kite-status"];
+    const nonSymbolTypes = ["news", "ai", "kite-callback", "kite-status", "holidays"];
     if (!symbol && !nonSymbolTypes.includes(type)) {
       return _json({ error: "Missing symbol" }, 400);
     }
@@ -81,6 +81,42 @@ export default {
         // Kite tokens expire around 6am next day — treat >20h as stale
         const active = ageHours < 20;
         return _json({ active, userId, storedAt, ageHours: parseFloat(ageHours.toFixed(1)) }, 200);
+      }
+
+      // ── NSE Holidays ───────────────────────────────────────────────────────
+      if (type === "holidays") {
+        try {
+          // NSE requires a session cookie — get it from the home page first
+          const homeRes = await fetch("https://www.nseindia.com/", {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+              "Accept-Language": "en-IN,en;q=0.9",
+            },
+          });
+          const cookie = homeRes.headers.get("set-cookie") || "";
+          const apiRes = await fetch("https://www.nseindia.com/api/holiday-master?type=trading", {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "application/json, */*",
+              "Accept-Language": "en-IN,en;q=0.9",
+              "Referer": "https://www.nseindia.com/",
+              "Cookie": cookie,
+            },
+          });
+          const data = await apiRes.json();
+          const holidays = (data.CM || []).map(h => {
+            // tradingDate is "14-Sep-2026"
+            const d = new Date(h.tradingDate + " 12:00:00 IST");
+            if (isNaN(d.getTime())) return null;
+            return d.getFullYear() + "-" +
+              String(d.getMonth() + 1).padStart(2, "0") + "-" +
+              String(d.getDate()).padStart(2, "0");
+          }).filter(Boolean);
+          return _json({ holidays, source: "nse" }, 200);
+        } catch (e) {
+          return _json({ holidays: [], error: String(e) }, 200);
+        }
       }
 
       // ── AI Analysis ────────────────────────────────────────────────────────

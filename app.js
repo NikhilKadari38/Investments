@@ -382,6 +382,7 @@ function _initMobile() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function _initApp() {
+  _fetchNSEHolidays(); // non-blocking — merges live holidays into NSE_HOLIDAYS set
   _updateMarketStatus();
   setInterval(_updateMarketStatus, 60000);
   await _loadTrades();
@@ -1224,13 +1225,68 @@ async function _fetchAndSavePrice(tradeId, symbol, exchange) {
   _updateSummary();
 }
 
+// ─── NSE Trading Holidays ─────────────────────────────────────────────────────
+const NSE_HOLIDAYS = new Set([
+  // 2025
+  "2025-02-26", // Mahashivratri
+  "2025-03-14", // Holi
+  "2025-04-14", // Dr. Ambedkar Jayanti
+  "2025-04-18", // Good Friday
+  "2025-05-01", // Maharashtra Day
+  "2025-08-15", // Independence Day
+  "2025-08-27", // Ganesh Chaturthi
+  "2025-10-02", // Gandhi Jayanti / Dussehra
+  "2025-10-21", // Diwali – Laxmi Pujan
+  "2025-10-22", // Diwali – Balipratipada
+  "2025-11-05", // Guru Nanak Jayanti
+  "2025-12-25", // Christmas
+  // 2026
+  "2026-01-26", // Republic Day
+  "2026-03-17", // Holi
+  "2026-04-03", // Good Friday
+  "2026-04-14", // Dr. Ambedkar Jayanti
+  "2026-05-01", // Maharashtra Day
+  "2026-08-15", // Independence Day
+  "2026-09-14", // Ganesh Chaturthi / Vinayaka Chavithi
+  "2026-10-02", // Gandhi Jayanti
+  "2026-10-26", // Diwali – Laxmi Pujan (approx)
+  "2026-10-27", // Diwali – Balipratipada (approx)
+  "2026-11-24", // Guru Nanak Jayanti (approx)
+  "2026-12-25", // Christmas
+]);
+
+function _isNSEHoliday(istDate) {
+  const y = istDate.getFullYear();
+  const m = String(istDate.getMonth() + 1).padStart(2, "0");
+  const d = String(istDate.getDate()).padStart(2, "0");
+  return NSE_HOLIDAYS.has(`${y}-${m}-${d}`);
+}
+
+async function _fetchNSEHolidays() {
+  const CACHE_KEY = "nseHolidaysCache";
+  const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      cached.dates.forEach(d => NSE_HOLIDAYS.add(d));
+      return;
+    }
+    const res  = await fetch(AI_WORKER + "?type=holidays");
+    const data = await res.json();
+    if (data.holidays?.length) {
+      data.holidays.forEach(d => NSE_HOLIDAYS.add(d));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), dates: data.holidays }));
+    }
+  } catch { /* silent — hardcoded list still works */ }
+}
+
 // ─── Market Hours Check ───────────────────────────────────────────────────────
 function _isMarketHours() {
   const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const day = ist.getDay();
   const min = ist.getHours() * 60 + ist.getMinutes();
-  // Mon–Fri, 9:15 AM to 3:30 PM IST
-  return day >= 1 && day <= 5 && min >= 555 && min <= 930;
+  // Mon–Fri, 9:15 AM to 3:30 PM IST, excluding NSE holidays
+  return day >= 1 && day <= 5 && min >= 555 && min <= 930 && !_isNSEHoliday(ist);
 }
 
 // ─── Refresh All Prices ───────────────────────────────────────────────────────
@@ -1480,6 +1536,7 @@ function _updateMarketStatus() {
   const day  = ist.getDay();
   const open =
     day >= 1 && day <= 5 &&
+    !_isNSEHoliday(ist) &&
     (h > 9 || (h === 9 && m >= 15)) &&
     (h < 15 || (h === 15 && m <= 30));
 
