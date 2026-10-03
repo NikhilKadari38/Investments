@@ -696,8 +696,9 @@ function _openAddModal() {
   if (!modal) return;
   const title = $("intradayModalTitle");
   if (title) title.textContent = "Add Intraday Trade";
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  const dateEl = $("idInputDate"); if (dateEl) dateEl.value = today;
+  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [ty, tm, td] = todayIST.split("-");
+  const dateEl = $("idInputDate"); if (dateEl) dateEl.value = td + "/" + tm + "/" + ty;
   const sym    = $("idInputSymbol"); if (sym) sym.value = "";
   const qty    = $("idInputQty");    if (qty) qty.value = "";
   const entry  = $("idInputEntry");  if (entry) entry.value = "";
@@ -715,7 +716,7 @@ function _openEditModal(id) {
   const modal = $("intradayModal");
   if (!modal) return;
   const title = $("intradayModalTitle"); if (title) title.textContent = "Edit Trade";
-  const dateEl = $("idInputDate"); if (dateEl) dateEl.value = t.date;
+  const dateEl = $("idInputDate"); if (dateEl) { const [ey,em,ed]=t.date.split("-"); dateEl.value=ed+"/"+em+"/"+ey; }
   const sym    = $("idInputSymbol"); if (sym) sym.value = t.symbol;
   const qty    = $("idInputQty");    if (qty) qty.value = t.qty;
   const entry  = $("idInputEntry");  if (entry) entry.value = t.entryPrice;
@@ -761,7 +762,9 @@ function _calcGross() {
 }
 
 async function _saveTrade() {
-  const date       = $("idInputDate")?.value;
+  const _rawDate   = $("idInputDate")?.value || "";
+  const _dp        = _rawDate.split("/");
+  const date       = _dp.length === 3 && _dp[2].length === 4 ? _dp[2]+"-"+_dp[1].padStart(2,"0")+"-"+_dp[0].padStart(2,"0") : _rawDate;
   const symbol     = $("idInputSymbol")?.value.trim().toUpperCase();
   const qty        = parseFloat($("idInputQty")?.value);
   const entryPrice = parseFloat($("idInputEntry")?.value);
@@ -884,6 +887,15 @@ function _showIdConfirm({ icon = "", title = "", msg = "", confirmLabel = "Confi
 
 // ── Event Binding (once) ──────────────────────────────────────────────────────
 function _bindEvents() {
+  // Auto-slash DD/MM/YYYY on date input
+  const _dateInp = $("idInputDate");
+  if (_dateInp) _dateInp.addEventListener("input", () => {
+    let v = _dateInp.value.replace(/\D/g,"").slice(0,8);
+    if (v.length > 4) v = v.slice(0,2)+"/"+v.slice(2,4)+"/"+v.slice(4);
+    else if (v.length > 2) v = v.slice(0,2)+"/"+v.slice(2);
+    _dateInp.value = v;
+  });
+
   // Add button
   $("intradayAddBtn")?.addEventListener("click", _openAddModal);
 

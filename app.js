@@ -374,7 +374,7 @@ function _initMobile() {
       $("intradayAddBtn")?.click();
     } else {
       $("addTradeModal").classList.remove("hidden");
-      $("inputBuyDate").valueAsDate = new Date();
+      $("inputBuyDate").value = _todayDMY();
       $("inputSymbol").focus();
     }
   });
@@ -683,10 +683,14 @@ function _renderCards(filtered) {
   }
 }
 
+// ─── Date input auto-slash (DD/MM/YYYY) ──────────────────────────────────────
+_autoSlashDate($("inputBuyDate"));
+_autoSlashDate($("sellDateInput"));
+
 // ─── Add Trade Modal ──────────────────────────────────────────────────────────
 $("addTradeBtn").addEventListener("click", () => {
   $("addTradeModal").classList.remove("hidden");
-  $("inputBuyDate").valueAsDate = new Date();
+  $("inputBuyDate").value = _todayDMY();
   $("inputSymbol").focus();
 });
 
@@ -694,7 +698,7 @@ function _closeAddModal() {
   $("addTradeModal").classList.add("hidden");
   ["inputSymbol","inputShares","inputBuyPrice","inputInvested"].forEach((id) => { $(id).value = ""; });
   $("inputExchange").value     = "auto";
-  $("inputBuyDate").valueAsDate = new Date();
+  $("inputBuyDate").value = _todayDMY();
 }
 
 $("closeAddModal").addEventListener("click",  _closeAddModal);
@@ -714,7 +718,7 @@ $("confirmAddTrade").addEventListener("click", async () => {
   const exchSel  = $("inputExchange").value;
   const shares   = parseInt($("inputShares").value);
   const buyPrice = parseFloat($("inputBuyPrice").value);
-  const buyDate  = $("inputBuyDate").value;
+  const buyDate  = _dmyToYMD($("inputBuyDate").value);
 
   if (!symbol || !shares || !buyPrice || !buyDate) { _toast("Please fill all fields.", "error"); return; }
   if (shares < 1)                                   { _toast("Shares must be at least 1.", "error"); return; }
@@ -761,7 +765,7 @@ function _openSellModal(tradeId) {
   $("sellSharesInput").value      = trade.shares;
   $("sellSharesInput").max        = trade.shares;
   $("sellPriceInput").value       = "";
-  $("sellDateInput").valueAsDate  = new Date();
+  $("sellDateInput").value = _todayDMY();
   $("sellAmountInput").value      = "";
   $("sellPreview").innerHTML      = "";
 
@@ -808,7 +812,7 @@ $("confirmSell").addEventListener("click", async () => {
 
   const ss    = parseInt($("sellSharesInput").value);
   const sp    = parseFloat($("sellPriceInput").value);
-  const sDate = $("sellDateInput").value;
+  const sDate = _dmyToYMD($("sellDateInput").value);
 
   if (!ss || !sp || !sDate)  { _toast("Fill all fields.", "error"); return; }
   if (ss > trade.shares)     { _toast("Exceeds available shares.", "error"); return; }
@@ -847,7 +851,7 @@ $("confirmSell").addEventListener("click", async () => {
 
       // New row for remaining shares (same buy price)
       const newData = {
-        symbol: trade.symbol, exchange: trade.exchange,
+        symbol: trade.symbol, exchange: trade.exchange, fund: trade.fund,
         shares: remaining, buyPrice: trade.buyPrice, buyDate: trade.buyDate,
         investedAmount: remaining * trade.buyPrice,
         sellShares: null, sellPrice: null, sellDate: null,
@@ -1602,6 +1606,32 @@ function _fmtDate(str) {
   if (!str) return "–";
   const [y, m, d] = str.split("-");
   return d + "/" + m + "/" + y.slice(2);
+}
+
+// DD/MM/YYYY ↔ YYYY-MM-DD helpers for text date inputs
+function _todayDMY() {
+  const n = new Date();
+  return String(n.getDate()).padStart(2,"0") + "/" +
+         String(n.getMonth()+1).padStart(2,"0") + "/" + n.getFullYear();
+}
+function _dmyToYMD(str) {
+  if (!str || str.length < 8) return "";
+  const [d, m, y] = str.split("/");
+  if (!d || !m || !y || y.length < 4) return "";
+  return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
+}
+function _ymdToDMY(str) {
+  if (!str) return "";
+  const [y, m, d] = str.split("-");
+  return d + "/" + m + "/" + y;
+}
+function _autoSlashDate(input) {
+  input.addEventListener("input", () => {
+    let v = input.value.replace(/\D/g, "").slice(0, 8);
+    if (v.length > 4) v = v.slice(0,2) + "/" + v.slice(2,4) + "/" + v.slice(4);
+    else if (v.length > 2) v = v.slice(0,2) + "/" + v.slice(2);
+    input.value = v;
+  });
 }
 
 function _daysHeldLabel(trade) {
